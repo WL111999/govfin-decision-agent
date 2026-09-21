@@ -187,15 +187,51 @@ Nexent 自己。这是接入失败最常见的原因，所以在 `deploy/README.
 
 ## 七、当前状态
 
+全部打通，实测环境为 Docker Desktop 29.8.0 + Nexent v2.6.0 全量部署（12 个容器）。
+
 | 项 | 状态 |
 |---|---|
-| MCP / A2A 服务端到端 | ✅ 本机实测通过（见第五节） |
+| MCP / A2A 服务端到端 | ✅ 实测通过（见第五节） |
 | 10 个工具 / 7 个智能体 / 4 阶段编排 | ✅ 实测通过 |
-| 3 份 Skill 包结构（对齐 Nexent `SkillLoader`） | ✅ 已校验 `name`/`description`/`allowed-tools`/`tags` 四字段可解析 |
-| 容器化部署件（`deploy/`） | ✅ 就绪 |
-| Nexent 平台侧真机注册 | ⏳ 需本机 Docker 守护进程运行后执行，步骤见 `deploy/README.md` |
+| 容器镜像构建 | ✅ `govfin-decision-agent:1.0.0`，构建期内置自检全绿 |
+| 容器内服务运行 | ✅ `Up (healthy)`，MCP / A2A 双入口正常 |
+| govfin 接入 Nexent 网络 | ✅ `docker network connect nexent_network govfin-agent` |
+| **从 Nexent 容器内访问 govfin** | ✅ MCP 握手 200、列出 10 个工具；A2A `/health` 返回完整图状态 |
+| **Nexent 侧 MCP 注册** | ✅ `govfin-decision`，`enabled=true`，自动发现 10 个工具 |
+| **3 份 Skill 导入** | ✅ 全部 HTTP 201 |
 
-**说明**：工具与编排逻辑的验证不依赖容器——MCP 与 A2A 都是标准协议，
-本机以 Python 直起服务后走的握手、工具调用、编排日志与容器内完全一致
-（唯一的差别是服务地址）。Nexent 侧剩下的工作是网络接入与界面注册，
-`deploy/` 里已把这一步压到"贴一段 compose + 填两个字段"。
+### 注册是怎么做的
+
+用脚本走 API，而不是在界面上点：
+
+```bash
+python -X utf8 scripts/register_to_nexent.py            # 幂等，可重复跑
+python -X utf8 scripts/register_to_nexent.py --list-only # 只看现状
+```
+
+**为什么不用界面。** 界面上点完就没了，而注册动作本身也是需要可复现的：换一台机器、
+换一套部署，你得重新回忆当时填了什么。脚本留在仓库里，注册了哪些工具、哪些技能、
+发现到几个工具，都是可核对的输出。
+
+**这一步的价值不只是省事。** `registry_json._toolNames` 返回的 10 个工具名，是
+**Nexent 自己连上 govfin 的 MCP 端点后发现的**，不是我们写进去的声明——也就是说，
+这条回执同时证明了三件事：网络通、MCP 协议握手成功、工具清单能被正确解析。
+
+### 与 Skill 的 `allowed-tools` 对齐
+
+Skill 里写的 `allowed-tools` 必须与 Nexent 发现到的工具名**逐字一致**。这一点值得
+单独盯着，因为工具名对不上时**不会报错**——只表现为模型不去用那个工具，而"模型选择
+不用"和"工具根本不存在"在日志里长得一模一样。
+
+实测发现到的 10 个名字：
+
+```
+gov_business_lookup  gov_social_security  gov_judicial_scan  fin_financial_parser
+kg_path_query  evidence_bundle  risk_decision  ontology_status  ontology_evolve  graph_stats
+```
+
+与 `deploy/mcp_config.json` 的 `expectedTools` 及三份 SKILL.md 的 `allowed-tools` 一致。
+
+### 界面入口
+
+`http://localhost:3000`，超管账号在部署时自动创建（部署日志里会打印邮箱与密码）。
