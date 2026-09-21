@@ -16,7 +16,12 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
     "httpx>=0.27",
-    "pypdf>=4.0",
+    # PDF 解析用 pdfplumber（要几何表格信息来还原嵌套子表，见 parsers/pdf_parser.py）。
+    # 这里**曾经写的是 pypdf**——一个从头到尾没有被 import 过的包。后果不是报错，
+    # 而是：开发机上因为别的原因装过 pdfplumber，一切正常；任何按本文件全新安装的
+    # 环境（包括容器）都解析不了 PDF，而这不抛异常、不中断导入——判决书里的公司
+    # 只是从图上消失了。依赖声明写错是最难发现的一类缺陷，因为开发机永远不会复现。
+    "pdfplumber>=0.11",
     "pydantic>=2.5",
     "mcp>=1.0",
 ]

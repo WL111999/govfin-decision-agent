@@ -89,6 +89,23 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "",
         f"{TEST_FILE}::test_equivalent_numbers_from_different_sources_do_not_raise_a_phantom_conflict",
     ),
+    (
+        "PDF 依赖声明改回那个从没被 import 的 pypdf",
+        "pyproject.toml",
+        '    "pdfplumber>=0.11",\n',
+        '    "pypdf>=4.0",\n',
+        "tests/test_ingest_completeness.py::test_pdf_backend_matches_the_declared_dependency",
+    ),
+    (
+        "导入时静默跳过解析失败的文档",
+        "src/govfin/runtime.py",
+        '                totals["skipped"].append(\n'
+        '                    {"file": path.name, "reason": f"{type(exc).__name__}: {exc}"}\n'
+        "                )\n"
+        "                continue\n",
+        "                continue\n",
+        "tests/test_ingest_completeness.py::test_ingest_reports_skipped_documents_instead_of_swallowing_them",
+    ),
 ]
 
 

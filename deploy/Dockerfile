@@ -44,12 +44,26 @@ ENV GOVFIN_MCP_PORT=8930 \
 
 # tini 做 PID 1：uvicorn 和 stdio MCP 都涉及子进程，缺 init 会留下僵尸进程
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["sh", "-c", "python -m govfin.mcp.server --transport streamable-http --port ${GOVFIN_MCP_PORT} & python -m govfin.a2a.server --port ${GOVFIN_A2A_PORT} & wait -n"]
+
+# 这里**必须用 bash 而不是 sh**。Debian 的 /bin/sh 是 dash，而 `wait -n`
+# （任一子进程退出就返回）是 bash 的扩展，dash 不认，会直接报
+# `wait: Illegal option -n` 并让容器以退出码 2 结束——镜像构建得好好的，
+# 容器却起不来。基础镜像里本来就带 bash（Debian 的 bash 是 Essential），所以
+# 不需要额外装，只要显式点名。
+#
+# 用 `wait -n` 而不是 `wait`：后者要等全部子进程结束，MCP 挂了而 A2A 还活着时
+# 容器会一直显示 running，健康检查却查不到 MCP——这正是本文件反复在消除的
+# 那种"看起来正常"的失效。
+CMD ["bash", "-c", "python -m govfin.mcp.server --transport streamable-http --port ${GOVFIN_MCP_PORT} & python -m govfin.a2a.server --port ${GOVFIN_A2A_PORT} & wait -n"]
 
 EXPOSE 8930 8940
 
-# 必须用 CMD-SHELL：exec 形式的 CMD 不做变量展开，${GOVFIN_A2A_PORT} 会被原样
-# 当字面量传给 curl，健康检查恒定失败——而且失败得不明显（容器一直是 unhealthy，
-# 但服务其实是好的）。
+# 必须用 CMD 的 **shell 形式**（而不是 `CMD ["curl", ...]` 的 exec 形式）：
+# exec 形式不经 shell，${GOVFIN_A2A_PORT} 会被原样当字面量传给 curl，健康检查
+# 恒定失败——而且失败得不明显（容器一直是 unhealthy，但服务其实是好的）。
+#
+# 注意这里**不能**写 `CMD-SHELL`：那是 docker-compose.yml 里的关键字
+# （`healthcheck.test: CMD-SHELL ...`），Dockerfile 的 HEALTHCHECK 只认 `CMD`，
+# 写成 CMD-SHELL 会在解析阶段直接报错，连镜像都构建不出来。
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD-SHELL curl -fsS "http://localhost:${GOVFIN_A2A_PORT}/health" || exit 1
+  CMD curl -fsS "http://localhost:${GOVFIN_A2A_PORT}/health" || exit 1

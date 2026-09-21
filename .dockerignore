@@ -1,0 +1,52 @@
+# 构建上下文里不该出现的东西。
+#
+# 缺这个文件时，`docker build` 会把 .git 历史、各家缓存目录一起打包发给守护进程。
+# 镜像里虽然只 COPY 了需要的几层，但**上下文传输是实打实的**——仓库越用越大，
+# 每次构建都在传一堆永远不会被用到的字节。
+
+.git/
+.github/
+.venv/
+venv/
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+!nexent/skills/dist/
+
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 密钥绝不进镜像。镜像层是可以被翻出来的（docker history / docker save），
+# 一旦打进某一层，删掉也不等于没发生过。
+.env
+.env.*
+!.env.example
+*.key
+*_secret*
+secrets/
+
+# 本地图数据库不进镜像：Dockerfile 里那句 `govfin ingest` 会在构建期重建一份，
+# 从零构建出来的图才是可复现的。带上本地那份，镜像就携带了开发机上的决策痕迹，
+# 而"这份痕迹是哪次跑出来的"没人答得上来。
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/generated/
+reports/
+*.log
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

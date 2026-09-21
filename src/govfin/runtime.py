@@ -112,11 +112,25 @@ class AgentRuntime:
             + list(root.rglob("*.txt")) + list(root.rglob("*.pdf")) + list(root.rglob("*.png"))
             if not p.name.endswith(".ocr.json")
         )
-        totals = {"documents": 0, "nodes_created": 0, "edges_created": 0, "tuples_routed_to_unk": 0}
+        totals: dict = {
+            "documents": 0,
+            "files_seen": len(files),
+            "nodes_created": 0,
+            "edges_created": 0,
+            "tuples_routed_to_unk": 0,
+            "skipped": [],
+        }
         for path in files:
             try:
                 result = self.extractor.extract(parse(str(path)))
-            except Exception:  # noqa: BLE001 - 单份文档解析失败不应中断整批导入
+            except Exception as exc:  # noqa: BLE001 - 单份文档解析失败不应中断整批导入
+                # 不中断整批是对的，**但必须记下是哪一份、为什么**。静默跳过的
+                # 后果不是少一份文档，而是导出摘要里那个 documents 计数看起来
+                # 一切正常——判决书里那家公司只是从图上消失了：构建成功、自检
+                # 通过、决策照跑，没有任何一处会提示"你少看了一份材料"。
+                totals["skipped"].append(
+                    {"file": path.name, "reason": f"{type(exc).__name__}: {exc}"}
+                )
                 continue
             report = self.loader.load(result)
             totals["documents"] += 1
