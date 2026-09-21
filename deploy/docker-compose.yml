@@ -1,0 +1,79 @@
+# govfin-decision-agent 单独部署。
+#
+# 这是**独立运行**的 compose，用于不接 Nexent 时验证 MCP / A2A 服务本身。
+# 接入 Nexent 时不要用这份——Nexent 有自己的 deploy/docker/docker-compose.yml，
+# 应当把本文件里的 govfin 服务段作为一段贴进 Nexent 的 compose，
+# 让两个容器处在同一个 docker 网络里，Nexent 才能用服务名访问 MCP 端点。
+# 具体步骤见 deploy/README.md。
+#
+#   docker compose -f deploy/docker-compose.yml up -d
+#   curl http://localhost:8940/health
+#
+# 默认用 mock profile 起（不需要 GPU、不需要外部模型）。要接真实模型：
+#   docker compose -f deploy/docker-compose.yml --profile llm up -d
+
+name: govfin
+
+services:
+  govfin-agent:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: govfin-decision-agent:1.0.0
+    container_name: govfin-agent
+    restart: unless-stopped
+    ports:
+      # MCP：Nexent 通过这个端口接入 10 个领域工具
+      - "${GOVFIN_MCP_PORT:-8930}:8930"
+      # A2A：Agent Card 发现与 JSON-RPC 任务接口
+      - "${GOVFIN_A2A_PORT:-8940}:8940"
+    environment:
+      # --- 图与数据 ---
+      GOVFIN_DATA_DIR: /app/data
+      GOVFIN_GRAPH_DB: /app/data/govfin_graph.db
+      GOVFIN_HOST: 0.0.0.0
+      GOVFIN_MCP_PORT: "8930"
+      GOVFIN_A2A_PORT: "8940"
+      GOVFIN_PUBLIC_BASE_URL: "${GOVFIN_PUBLIC_BASE_URL:-http://localhost:8940}"
+      # --- LLM 通道 ---
+      # 留空则自动降级为纯符号路径：本体演化仍可运行（只做别名学习与聚类对齐），
+      # 只是不再有 LLM 提案。这是设计内的降级，不是故障。
+      GOVFIN_LLM_PROVIDER: "${GOVFIN_LLM_PROVIDER:-deepseek}"
+      GOVFIN_LLM_API_KEY: "${GOVFIN_LLM_API_KEY:-}"
+      GOVFIN_LLM_BASE_URL: "${GOVFIN_LLM_BASE_URL:-https://api.deepseek.com/v1}"
+      GOVFIN_LLM_MODEL: "${GOVFIN_LLM_MODEL:-deepseek-chat}"
+      # --- 置信度模型（调这些等于改判定口径，改前先看 docs/confidence-model.md）---
+      GOVFIN_DECISION_THRESHOLD: "${GOVFIN_DECISION_THRESHOLD:-0.55}"
+      GOVFIN_HOP_DECAY: "${GOVFIN_HOP_DECAY:-0.95}"
+      GOVFIN_BOTTLENECK: "${GOVFIN_BOTTLENECK:-0.25}"
+      # --- 路径搜索安全边界 ---
+      GOVFIN_MAX_PATH_DEPTH: "${GOVFIN_MAX_PATH_DEPTH:-6}"
+      GOVFIN_MAX_EXPANSIONS: "${GOVFIN_MAX_EXPANSIONS:-200000}"
+      GOVFIN_QUERY_TIMEOUT: "${GOVFIN_QUERY_TIMEOUT:-10.0}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      # 图数据库持久化。**必须挂**——不挂的话容器重建即丢失全部决策痕迹，
+      # 而决策痕迹是审计的依据，丢了就无法回答"当初为什么这么判"。
+      - govfin-data:/app/data
+      # 数据目录只读挂载：便于不重建镜像就换测试数据集
+      - ../data:/app/data-ro:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8940/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - govfin-net
+    # 与 Nexent 同网部署时解开下面这段，让 Nexent 的容器能直接访问：
+    # external_links:
+    #   - nexent-nexent-1
+
+volumes:
+  govfin-data:
+    driver: local
+
+networks:
+  govfin-net:
+    name: govfin-net
+    driver: bridge

@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "govfin-decision-agent"
+version = "1.0.0"
+description = "金融+政务跨域可进化决策智能体 — 三层图认知、UNK 本体演化、约束路径推理、结构化决策溯源"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Ze44" }]
+keywords = ["knowledge-graph", "ontology-evolution", "mcp", "a2a", "nexent", "decision-provenance"]
+
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "httpx>=0.27",
+    "pypdf>=4.0",
+    "pydantic>=2.5",
+    "mcp>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "hypothesis>=6.100"]
+
+[project.scripts]
+govfin = "govfin.cli:main"
+govfin-mcp = "govfin.mcp.server:main"
+govfin-a2a = "govfin.a2a.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+govfin = ["../nexent/**/*", "../data/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]
+# 压力测试默认不跑：它要现场建一张十万节点的图，几十秒起步。留在默认回归里的
+# 后果不是"跑得慢"，而是所有人开始用 -k 绕开整个测试套件。
+# 需要时显式跑：pytest -m stress
+addopts = ["-m", "not stress"]
+markers = [
+    "brute: 暴力测试用例（模糊/压力/混沌/对抗）",
+    "stress: 压力测试，默认跳过（用 pytest -m stress 显式运行）",
+    "chaos: 故障注入测试",
+    "adversarial: 对抗性攻击测试",
+]

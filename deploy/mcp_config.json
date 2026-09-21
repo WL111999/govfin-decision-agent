@@ -1,0 +1,106 @@
+{
+  "_comment": "Nexent MCP 注册配置（容器化导入路径）。Nexent 的 MCP 配置页有两个入口，本文件用于第二个。",
+  "_which_path": {
+    "推荐：按 URL 直接添加": {
+      "入口": "MCP 配置页 → 添加服务（Add by URL）",
+      "name": "govfin-decision",
+      "url": "http://govfin-agent:8930/mcp",
+      "说明": "govfin 容器已在运行时用这个。最简单，也最不容易出错。"
+    },
+    "备选：导入本配置文件": {
+      "入口": "MCP 配置页 → 导入配置（Import Config）",
+      "说明": "Nexent 会用 image 起一个代理容器来托管该 MCP 服务。这条路径要求配置里必须有 command 与 args——Nexent 的 MCPServerConfig 把 command 定义为必填项（backend/consts/model.py），只给 url 会通不过校验。",
+      "额外字段": "导入时还需在界面上填 containerPort（容器内暴露端口）与服务名。"
+    }
+  },
+
+  "mcpServers": {
+    "govfin-decision": {
+      "command": "python",
+      "args": [
+        "-m",
+        "govfin.mcp.server",
+        "--transport",
+        "streamable-http",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8930"
+      ],
+      "env": {
+        "GOVFIN_DATA_DIR": "/app/data",
+        "GOVFIN_GRAPH_DB": "/app/data/govfin_graph.db",
+        "GOVFIN_LLM_PROVIDER": "deepseek",
+        "GOVFIN_LLM_API_KEY": ""
+      },
+      "port": 8930,
+      "image": "govfin-decision-agent:1.0.0"
+    }
+  },
+
+  "expectedTools": [
+    "gov_business_lookup",
+    "gov_social_security",
+    "gov_judicial_scan",
+    "fin_financial_parser",
+    "kg_path_query",
+    "risk_decision",
+    "evidence_bundle",
+    "ontology_status",
+    "ontology_evolve",
+    "graph_stats"
+  ],
+
+  "toolRouting": [
+    {
+      "tool": "gov_business_lookup",
+      "skill": "enterprise-authenticity-check",
+      "when": "授信流程第一步。found=false 表示登记库查无此主体，应终止流程。"
+    },
+    {
+      "tool": "gov_social_security",
+      "skill": "enterprise-authenticity-check",
+      "when": "核验用工规模真实性与经营稳定性；异常月数是'连续异常月数'阈值的观测来源。"
+    },
+    {
+      "tool": "gov_judicial_scan",
+      "skill": "counterparty-risk-contagion-scan",
+      "when": "采集行政处罚与涉诉事实。"
+    },
+    {
+      "tool": "fin_financial_parser",
+      "skill": "counterparty-risk-contagion-scan",
+      "when": "取偿债能力维度的指标，资产负债率自动计算。"
+    },
+    {
+      "tool": "kg_path_query",
+      "skill": "counterparty-risk-contagion-scan",
+      "when": "受约束的多跳推理；返回被拒路径及理由，审计要用。"
+    },
+    {
+      "tool": "risk_decision",
+      "skill": "credit-decision-chain",
+      "when": "合成授信结论并写入运行时图。"
+    },
+    {
+      "tool": "evidence_bundle",
+      "skill": "credit-decision-chain",
+      "when": "取回完整依据链与依据漂移检测。"
+    },
+    {
+      "tool": "ontology_status",
+      "skill": "*",
+      "when": "判断本体覆盖度；UNK 储备池堆积说明规则覆盖不足。"
+    },
+    {
+      "tool": "ontology_evolve",
+      "skill": "*",
+      "when": "触发本体演化。未过一致性验证的提案会退回人工仲裁。"
+    },
+    {
+      "tool": "graph_stats",
+      "skill": "*",
+      "when": "调用前确认图谱已加载。"
+    }
+  ]
+}

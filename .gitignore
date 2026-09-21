@@ -1,0 +1,43 @@
+# 密钥与本地配置 —— 绝不提交
+.env
+.env.*
+!.env.example
+*.key
+*_secret*
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+# 但 nexent/skills/dist/ 里的三个 zip 是**交付件**（要导进 Nexent 的 Skill 包），
+# 不是构建产物。上面的 `dist/` 会把它们一起忽略掉，而忽略是静默的——
+# 仓库看着一切正常，只是少了三个文件，且要等到导入 Nexent 时才发现。
+!nexent/skills/dist/
+.venv/
+venv/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 数据与产物
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/generated/
+reports/
+*.log
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

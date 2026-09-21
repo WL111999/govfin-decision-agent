@@ -1,0 +1,2283 @@
+{
+  "version": "0.2.0",
+  "classes": [
+    {
+      "name": "主体",
+      "parent": null,
+      "definition": "可承担权利义务的法律或自然主体",
+      "aliases": [],
+      "required_properties": [],
+      "optional_properties": [],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "企业",
+      "parent": "主体",
+      "definition": "依法设立的营利法人",
+      "aliases": [
+        "公司",
+        "法人企业"
+      ],
+      "required_properties": [
+        "统一社会信用代码",
+        "名称"
+      ],
+      "optional_properties": [
+        "注册资本",
+        "成立日期",
+        "行业",
+        "经营状态"
+      ],
+      "disjoint_with": [
+        "自然人"
+      ],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "小微企业",
+      "parent": "企业",
+      "definition": "符合中小企业划型标准的小型、微型企业",
+      "aliases": [
+        "中小企业",
+        "小微"
+      ],
+      "required_properties": [
+        "统一社会信用代码",
+        "名称"
+      ],
+      "optional_properties": [
+        "从业人数",
+        "营业收入"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "中型企业",
+      "parent": "企业",
+      "definition": "符合中型企业划型标准的企业",
+      "aliases": [],
+      "required_properties": [
+        "统一社会信用代码",
+        "名称"
+      ],
+      "optional_properties": [
+        "从业人数",
+        "营业收入"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "个体工商户",
+      "parent": "主体",
+      "definition": "经登记的个体工商户",
+      "aliases": [
+        "个体户"
+      ],
+      "required_properties": [
+        "名称"
+      ],
+      "optional_properties": [
+        "统一社会信用代码",
+        "经营者"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "自然人",
+      "parent": "主体",
+      "definition": "生物学意义上的自然人",
+      "aliases": [
+        "个人"
+      ],
+      "required_properties": [
+        "姓名"
+      ],
+      "optional_properties": [
+        "身份证号",
+        "任职"
+      ],
+      "disjoint_with": [
+        "企业"
+      ],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "金融机构",
+      "parent": "主体",
+      "definition": "依法设立的银行等信贷机构",
+      "aliases": [
+        "银行"
+      ],
+      "required_properties": [
+        "机构名称"
+      ],
+      "optional_properties": [
+        "金融许可证号"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "信贷产品",
+      "parent": null,
+      "definition": "金融机构提供的授信产品",
+      "aliases": [
+        "贷款产品"
+      ],
+      "required_properties": [
+        "产品名称"
+      ],
+      "optional_properties": [
+        "额度上限",
+        "利率下限"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "中小企业授信",
+      "parent": "信贷产品",
+      "definition": "面向中小企业的经营性授信",
+      "aliases": [
+        "小微贷款"
+      ],
+      "required_properties": [
+        "产品名称"
+      ],
+      "optional_properties": [
+        "担保要求"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "供应链金融",
+      "parent": "信贷产品",
+      "definition": "基于核心企业信用的链式融资",
+      "aliases": [],
+      "required_properties": [
+        "产品名称"
+      ],
+      "optional_properties": [
+        "核心企业要求"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "个人经营贷",
+      "parent": "信贷产品",
+      "definition": "面向个体工商户主的经营性贷款",
+      "aliases": [],
+      "required_properties": [
+        "产品名称"
+      ],
+      "optional_properties": [],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "担保",
+      "parent": null,
+      "definition": "为债务履行提供的保证安排",
+      "aliases": [
+        "保证"
+      ],
+      "required_properties": [
+        "担保方式"
+      ],
+      "optional_properties": [
+        "担保金额",
+        "担保期限"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "授信申请",
+      "parent": null,
+      "definition": "借款人向金融机构提出的授信请求",
+      "aliases": [],
+      "required_properties": [
+        "申请编号",
+        "申请金额"
+      ],
+      "optional_properties": [
+        "申请日期",
+        "用途"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "政务记录",
+      "parent": null,
+      "definition": "政府部门在履职过程中形成的记录",
+      "aliases": [
+        "政务数据"
+      ],
+      "required_properties": [
+        "记录编号"
+      ],
+      "optional_properties": [
+        "出具机关",
+        "形成日期"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "工商登记",
+      "parent": "政务记录",
+      "definition": "市场监督管理部门的企业登记信息",
+      "aliases": [
+        "工商信息",
+        "注册登记"
+      ],
+      "required_properties": [
+        "记录编号",
+        "统一社会信用代码"
+      ],
+      "optional_properties": [
+        "注册资本",
+        "经营范围",
+        "登记状态"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "社保缴纳记录",
+      "parent": "政务记录",
+      "definition": "社会保险经办机构记录的缴费明细",
+      "aliases": [
+        "社保记录",
+        "参保记录",
+        "社保缴纳记录信息"
+      ],
+      "required_properties": [
+        "记录编号",
+        "缴纳月份"
+      ],
+      "optional_properties": [
+        "缴纳基数",
+        "实缴人数",
+        "缴纳状态"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "行政处罚",
+      "parent": "政务记录",
+      "definition": "行政机关对违法行为的处罚决定",
+      "aliases": [
+        "处罚记录"
+      ],
+      "required_properties": [
+        "记录编号",
+        "处罚事由"
+      ],
+      "optional_properties": [
+        "处罚金额",
+        "处罚日期",
+        "处罚机关"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "司法涉诉",
+      "parent": "政务记录",
+      "definition": "司法机关办理的诉讼与执行案件",
+      "aliases": [
+        "涉诉记录",
+        "司法案件"
+      ],
+      "required_properties": [
+        "记录编号",
+        "案由"
+      ],
+      "optional_properties": [
+        "立案日期",
+        "涉案金额",
+        "审理状态"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "环保核查",
+      "parent": "政务记录",
+      "definition": "生态环境部门的合规核查结论",
+      "aliases": [
+        "环保记录"
+      ],
+      "required_properties": [
+        "记录编号"
+      ],
+      "optional_properties": [
+        "核查结论",
+        "核查日期"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "税务缴纳记录",
+      "parent": "政务记录",
+      "definition": "税务机关记录的纳税申报与缴纳信息",
+      "aliases": [
+        "纳税记录"
+      ],
+      "required_properties": [
+        "记录编号"
+      ],
+      "optional_properties": [
+        "缴纳月份",
+        "实缴税额"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "财务事实",
+      "parent": null,
+      "definition": "反映主体财务状况的结构化事实",
+      "aliases": [
+        "财务数据"
+      ],
+      "required_properties": [
+        "事实编号"
+      ],
+      "optional_properties": [
+        "报告期"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "财务报表",
+      "parent": "财务事实",
+      "definition": "资产负债、利润、现金流量报表",
+      "aliases": [
+        "财报"
+      ],
+      "required_properties": [
+        "事实编号",
+        "报告期"
+      ],
+      "optional_properties": [
+        "营业收入",
+        "净利润",
+        "资产负债率"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "征信报告",
+      "parent": "财务事实",
+      "definition": "征信机构出具的信用记录报告",
+      "aliases": [
+        "信用报告"
+      ],
+      "required_properties": [
+        "事实编号"
+      ],
+      "optional_properties": [
+        "查询日期",
+        "逾期次数",
+        "负债总额"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "银行流水",
+      "parent": "财务事实",
+      "definition": "银行账户的交易明细",
+      "aliases": [
+        "流水"
+      ],
+      "required_properties": [
+        "事实编号"
+      ],
+      "optional_properties": [
+        "统计区间",
+        "月均入账"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "风险指标",
+      "parent": null,
+      "definition": "用于刻画主体风险程度的可量化维度",
+      "aliases": [
+        "指标"
+      ],
+      "required_properties": [
+        "指标名称"
+      ],
+      "optional_properties": [
+        "指标值",
+        "取值时点"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "经营稳定性",
+      "parent": "风险指标",
+      "definition": "反映主体持续经营能力的综合指标",
+      "aliases": [],
+      "required_properties": [
+        "指标名称"
+      ],
+      "optional_properties": [
+        "指标值"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "偿债能力",
+      "parent": "风险指标",
+      "definition": "反映主体到期偿付能力的指标",
+      "aliases": [],
+      "required_properties": [
+        "指标名称"
+      ],
+      "optional_properties": [
+        "指标值"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "关联风险",
+      "parent": "风险指标",
+      "definition": "由关联方传导而来的风险敞口",
+      "aliases": [],
+      "required_properties": [
+        "指标名称"
+      ],
+      "optional_properties": [
+        "指标值",
+        "传导来源"
+      ],
+      "disjoint_with": [],
+      "layer": 1,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "监管规范",
+      "parent": null,
+      "definition": "约束信贷业务行为的规范性文件",
+      "aliases": [
+        "规则文件"
+      ],
+      "required_properties": [
+        "文件名称"
+      ],
+      "optional_properties": [
+        "发文机关",
+        "生效日期"
+      ],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "监管条款",
+      "parent": "监管规范",
+      "definition": "规范性文件中可独立引用的条款单元",
+      "aliases": [
+        "条款",
+        "条文"
+      ],
+      "required_properties": [
+        "条款编号",
+        "条款原文"
+      ],
+      "optional_properties": [
+        "条款明确程度",
+        "适用对象"
+      ],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "授信指引条款",
+      "parent": "监管条款",
+      "definition": "关于授信审查与审批的指引条款",
+      "aliases": [],
+      "required_properties": [
+        "条款编号",
+        "条款原文"
+      ],
+      "optional_properties": [
+        "风险权重"
+      ],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "定价规则条款",
+      "parent": "监管条款",
+      "definition": "关于利率与费率定价的规则条款",
+      "aliases": [
+        "LPR规则"
+      ],
+      "required_properties": [
+        "条款编号",
+        "条款原文"
+      ],
+      "optional_properties": [
+        "基准利率"
+      ],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "政策条款",
+      "parent": "监管规范",
+      "definition": "地方产业扶持或限制类政策条款",
+      "aliases": [
+        "扶持政策"
+      ],
+      "required_properties": [
+        "条款编号",
+        "条款原文"
+      ],
+      "optional_properties": [
+        "适用行业",
+        "扶持力度"
+      ],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "数据规范",
+      "parent": "监管规范",
+      "definition": "数据共享与使用的合规要求",
+      "aliases": [
+        "数据标准"
+      ],
+      "required_properties": [
+        "条款编号",
+        "条款原文"
+      ],
+      "optional_properties": [],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "风险维度",
+      "parent": null,
+      "definition": "规则体系中定义的风险评估维度",
+      "aliases": [
+        "评估维度"
+      ],
+      "required_properties": [
+        "维度名称",
+        "维度权重"
+      ],
+      "optional_properties": [
+        "取值说明"
+      ],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "阈值",
+      "parent": null,
+      "definition": "触发规则判定的数值边界",
+      "aliases": [
+        "临界值"
+      ],
+      "required_properties": [
+        "阈值名称",
+        "阈值"
+      ],
+      "optional_properties": [
+        "比较方向",
+        "适用维度"
+      ],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "合规判定",
+      "parent": null,
+      "definition": "规则推理得出的合规性结论",
+      "aliases": [
+        "合规结论"
+      ],
+      "required_properties": [
+        "判定结论"
+      ],
+      "optional_properties": [
+        "判定依据",
+        "判定时点"
+      ],
+      "disjoint_with": [],
+      "layer": 2,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "决策",
+      "parent": null,
+      "definition": "一次智能体决策的完整记录",
+      "aliases": [
+        "决策记录"
+      ],
+      "required_properties": [
+        "决策编号",
+        "决策时点"
+      ],
+      "optional_properties": [
+        "决策类型",
+        "结论"
+      ],
+      "disjoint_with": [],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "授信决策",
+      "parent": "决策",
+      "definition": "针对授信申请的批准或拒绝决定",
+      "aliases": [],
+      "required_properties": [
+        "决策编号",
+        "决策时点"
+      ],
+      "optional_properties": [
+        "建议额度",
+        "拒绝原因"
+      ],
+      "disjoint_with": [],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "合规判定决策",
+      "parent": "决策",
+      "definition": "针对特定行为合规性的判定决定",
+      "aliases": [],
+      "required_properties": [
+        "决策编号",
+        "决策时点"
+      ],
+      "optional_properties": [
+        "判定结论"
+      ],
+      "disjoint_with": [],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "风险预警决策",
+      "parent": "决策",
+      "definition": "针对风险信号触发的预警决定",
+      "aliases": [],
+      "required_properties": [
+        "决策编号",
+        "决策时点"
+      ],
+      "optional_properties": [
+        "预警等级"
+      ],
+      "disjoint_with": [],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "推理步骤",
+      "parent": null,
+      "definition": "决策过程中的一个原子推理动作",
+      "aliases": [
+        "推理节点"
+      ],
+      "required_properties": [
+        "步骤序号",
+        "操作"
+      ],
+      "optional_properties": [
+        "中间结论"
+      ],
+      "disjoint_with": [],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "证据束",
+      "parent": null,
+      "definition": "支撑一次判定的一组证据",
+      "aliases": [
+        "证据包"
+      ],
+      "required_properties": [
+        "束编号"
+      ],
+      "optional_properties": [
+        "证据数",
+        "综合置信度"
+      ],
+      "disjoint_with": [],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "路径记录",
+      "parent": null,
+      "definition": "一次图路径搜索得到的推理链",
+      "aliases": [
+        "路径"
+      ],
+      "required_properties": [
+        "路径编号",
+        "跳数"
+      ],
+      "optional_properties": [
+        "置信度",
+        "是否采纳"
+      ],
+      "disjoint_with": [],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "采纳路径",
+      "parent": "路径记录",
+      "definition": "置信度达标并进入最终结论的路径",
+      "aliases": [],
+      "required_properties": [
+        "路径编号",
+        "跳数"
+      ],
+      "optional_properties": [
+        "贡献权重"
+      ],
+      "disjoint_with": [
+        "被拒路径"
+      ],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "被拒路径",
+      "parent": "路径记录",
+      "definition": "因置信度或约束不达标被排除的路径",
+      "aliases": [
+        "排除路径"
+      ],
+      "required_properties": [
+        "路径编号",
+        "跳数"
+      ],
+      "optional_properties": [
+        "拒绝原因"
+      ],
+      "disjoint_with": [
+        "采纳路径"
+      ],
+      "layer": 3,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "UNK候选",
+      "parent": null,
+      "definition": "现有本体无法归类的实体提及或关系表达",
+      "aliases": [
+        "未知类型"
+      ],
+      "required_properties": [
+        "候选文本",
+        "观测次数"
+      ],
+      "optional_properties": [
+        "来源文档",
+        "首次观测"
+      ],
+      "disjoint_with": [],
+      "layer": null,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "本体提案",
+      "parent": null,
+      "definition": "针对 UNK 候选生成的本体编辑提案",
+      "aliases": [
+        "演化提案"
+      ],
+      "required_properties": [
+        "提案编号",
+        "动作"
+      ],
+      "optional_properties": [
+        "置信度",
+        "触发证据"
+      ],
+      "disjoint_with": [],
+      "layer": null,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    },
+    {
+      "name": "本体版本",
+      "parent": null,
+      "definition": "本体的一次一致快照",
+      "aliases": [
+        "版本"
+      ],
+      "required_properties": [
+        "版本号",
+        "生效时间"
+      ],
+      "optional_properties": [
+        "变更摘要"
+      ],
+      "disjoint_with": [],
+      "layer": null,
+      "origin": "seed",
+      "introduced_in_version": "0.1.0"
+    }
+  ],
+  "properties": [
+    {
+      "name": "法定代表人",
+      "domain": "企业",
+      "range": "自然人",
+      "kind": "object",
+      "definition": "依法代表企业行使职权的自然人",
+      "inverse": "担任法定代表人",
+      "functional": true,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "担任法定代表人",
+      "domain": "自然人",
+      "range": "企业",
+      "kind": "object",
+      "definition": "自然人所法定代表的企业的逆关系",
+      "inverse": "法定代表人",
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "实际控制人",
+      "domain": "企业",
+      "range": "自然人",
+      "kind": "object",
+      "definition": "虽非股东但能实际支配企业行为的自然人",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "控股",
+      "domain": "自然人",
+      "range": "企业",
+      "kind": "object",
+      "definition": "自然人对企业持股达到控制比例",
+      "inverse": "被控股",
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "被控股",
+      "domain": "企业",
+      "range": "自然人",
+      "kind": "object",
+      "definition": "企业被自然人控股的逆关系",
+      "inverse": "控股",
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "企业参股",
+      "domain": "企业",
+      "range": "企业",
+      "kind": "object",
+      "definition": "企业法人之间的股权投资关系",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "任职于",
+      "domain": "自然人",
+      "range": "企业",
+      "kind": "object",
+      "definition": "自然人在企业担任职务",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "担保",
+      "domain": "企业",
+      "range": "企业",
+      "kind": "object",
+      "definition": "为另一企业的债务提供保证",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "申请",
+      "domain": "企业",
+      "range": "授信申请",
+      "kind": "object",
+      "definition": "企业提交的授信申请",
+      "inverse": "申请人",
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "申请人",
+      "domain": "授信申请",
+      "range": "企业",
+      "kind": "object",
+      "definition": "授信申请的提交主体",
+      "inverse": "申请",
+      "functional": true,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "申请产品",
+      "domain": "授信申请",
+      "range": "信贷产品",
+      "kind": "object",
+      "definition": "申请对应的信贷产品",
+      "inverse": null,
+      "functional": true,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "拥有工商登记",
+      "domain": "企业",
+      "range": "工商登记",
+      "kind": "object",
+      "definition": "企业对应的工商登记记录",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "缴纳社保",
+      "domain": "企业",
+      "range": "社保缴纳记录",
+      "kind": "object",
+      "definition": "企业为员工缴纳社保形成的记录",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "受到处罚",
+      "domain": "企业",
+      "range": "行政处罚",
+      "kind": "object",
+      "definition": "企业受到的行政处罚记录",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "涉及诉讼",
+      "domain": "企业",
+      "range": "司法涉诉",
+      "kind": "object",
+      "definition": "企业涉及的诉讼或执行案件",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "拥有财报",
+      "domain": "企业",
+      "range": "财务报表",
+      "kind": "object",
+      "definition": "企业对外披露的财务报表",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "查询征信",
+      "domain": "企业",
+      "range": "征信报告",
+      "kind": "object",
+      "definition": "针对企业获取的征信报告",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "遭受环保核查",
+      "domain": "企业",
+      "range": "环保核查",
+      "kind": "object",
+      "definition": "企业接受的环保合规核查",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "申报税务",
+      "domain": "企业",
+      "range": "税务缴纳记录",
+      "kind": "object",
+      "definition": "企业的纳税申报记录",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "触发风险信号",
+      "domain": "政务记录",
+      "range": "风险指标",
+      "kind": "object",
+      "definition": "政务记录触发的风险指标变化",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "受约束于",
+      "domain": "企业",
+      "range": "监管规范",
+      "kind": "object",
+      "definition": "[跨层 L1→L2] 企业业务行为所适用的监管规范",
+      "inverse": "适用于",
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "适用于",
+      "domain": "监管规范",
+      "range": "主体",
+      "kind": "object",
+      "definition": "[跨层 L2→L1] 规范所适用的主体范围",
+      "inverse": "受约束于",
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "映射维度",
+      "domain": "监管规范",
+      "range": "风险维度",
+      "kind": "object",
+      "definition": "规范所量化的风险维度",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "对应指标",
+      "domain": "风险维度",
+      "range": "风险指标",
+      "kind": "object",
+      "definition": "风险维度在具体主体上的指标实例化",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "设定阈值",
+      "domain": "监管规范",
+      "range": "阈值",
+      "kind": "object",
+      "definition": "规范中规定的判定阈值",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "约束维度",
+      "domain": "阈值",
+      "range": "风险维度",
+      "kind": "object",
+      "definition": "该阈值在判定时作用于哪个风险维度",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "细化",
+      "domain": "监管规范",
+      "range": "监管规范",
+      "kind": "object",
+      "definition": "上位规范被下位条款进一步细化",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "冲突于",
+      "domain": "监管规范",
+      "range": "监管规范",
+      "kind": "object",
+      "definition": "两条规范在同一事项上给出不相容要求",
+      "inverse": "冲突于",
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "决策依据条款",
+      "domain": "决策",
+      "range": "监管规范",
+      "kind": "object",
+      "definition": "[跨层 L3→L2] 决策所援引的监管规范",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "决策涉及实体",
+      "domain": "决策",
+      "range": "主体",
+      "kind": "object",
+      "definition": "[跨层 L3→L1] 决策过程中被激活的主体",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "包含步骤",
+      "domain": "决策",
+      "range": "推理步骤",
+      "kind": "object",
+      "definition": "决策分解出的有序推理步骤",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "步骤引用条款",
+      "domain": "推理步骤",
+      "range": "监管规范",
+      "kind": "object",
+      "definition": "[跨层 L3→L2] 该推理步骤引用的规范",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "步骤引用实体",
+      "domain": "推理步骤",
+      "range": "主体",
+      "kind": "object",
+      "definition": "[跨层 L3→L1] 该推理步骤引用的实体",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "步骤使用证据",
+      "domain": "推理步骤",
+      "range": "证据束",
+      "kind": "object",
+      "definition": "该推理步骤所消费的证据集合",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "收纳路径",
+      "domain": "决策",
+      "range": "路径记录",
+      "kind": "object",
+      "definition": "决策所考虑过的所有路径（含被拒）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "路径起点",
+      "domain": "路径记录",
+      "range": "主体",
+      "kind": "object",
+      "definition": "路径的起始节点",
+      "inverse": null,
+      "functional": true,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "路径终点",
+      "domain": "路径记录",
+      "range": "主体",
+      "kind": "object",
+      "definition": "路径的终止节点",
+      "inverse": null,
+      "functional": true,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "支撑结论",
+      "domain": "证据束",
+      "range": "风险指标",
+      "kind": "object",
+      "definition": "证据束所支撑的风险指标结论",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "提案针对候选",
+      "domain": "本体提案",
+      "range": "UNK候选",
+      "kind": "object",
+      "definition": "提案所要处理的 UNK 候选",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "版本包含提案",
+      "domain": "本体版本",
+      "range": "本体提案",
+      "kind": "object",
+      "definition": "该版本合并的提案集合",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": null
+    },
+    {
+      "name": "统一社会信用代码",
+      "domain": "企业",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "市场主体唯一识别码，18 位",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "名称",
+      "domain": "企业",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "主体登记名称",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "注册资本",
+      "domain": "企业",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "登记的注册资本（万元）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "成立日期",
+      "domain": "企业",
+      "range": "date",
+      "kind": "datatype",
+      "definition": "营业执照载明的成立日期",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "date"
+    },
+    {
+      "name": "经营状态",
+      "domain": "企业",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "存续/注销/吊销等状态",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "行业",
+      "domain": "企业",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "国民经济行业分类",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "从业人数",
+      "domain": "企业",
+      "range": "integer",
+      "kind": "datatype",
+      "definition": "报告期内的从业人数",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "integer"
+    },
+    {
+      "name": "营业收入",
+      "domain": "企业",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "报告期内营业收入（万元）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "姓名",
+      "domain": "自然人",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "自然人的姓名",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "身份证号",
+      "domain": "自然人",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "公民身份号码",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "产品名称",
+      "domain": "信贷产品",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "信贷产品名称",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "额度上限",
+      "domain": "信贷产品",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "产品允许的最高授信额度（万元）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "利率下限",
+      "domain": "信贷产品",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "产品适用的最低年化利率",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "记录编号",
+      "domain": "政务记录",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "政务记录的唯一编号",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "出具机关",
+      "domain": "政务记录",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "出具该记录的行政机关",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "缴纳月份",
+      "domain": "社保缴纳记录",
+      "range": "date",
+      "kind": "datatype",
+      "definition": "社保费款所属月份",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": "date"
+    },
+    {
+      "name": "缴纳基数",
+      "domain": "社保缴纳记录",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "当月社保缴纳基数",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "实缴人数",
+      "domain": "社保缴纳记录",
+      "range": "integer",
+      "kind": "datatype",
+      "definition": "当月实际参保人数",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "integer"
+    },
+    {
+      "name": "缴纳状态",
+      "domain": "社保缴纳记录",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "正常/欠缴/断缴",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "处罚事由",
+      "domain": "行政处罚",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "行政处罚所依据的违法事实",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "处罚金额",
+      "domain": "行政处罚",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "罚款金额（万元）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "处罚日期",
+      "domain": "行政处罚",
+      "range": "date",
+      "kind": "datatype",
+      "definition": "处罚决定作出日期",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "date"
+    },
+    {
+      "name": "案由",
+      "domain": "司法涉诉",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "案件的案由",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "涉案金额",
+      "domain": "司法涉诉",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "案件标的金额（万元）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "审理状态",
+      "domain": "司法涉诉",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "审理中/已结案/执行中",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "报告期",
+      "domain": "财务事实",
+      "range": "date",
+      "kind": "datatype",
+      "definition": "财务数据所属的报告期",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "date"
+    },
+    {
+      "name": "净利润",
+      "domain": "财务报表",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "报告期净利润（万元）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "资产负债率",
+      "domain": "财务报表",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "负债总额/资产总额",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "逾期次数",
+      "domain": "征信报告",
+      "range": "integer",
+      "kind": "datatype",
+      "definition": "报告期内的逾期次数",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "integer"
+    },
+    {
+      "name": "负债总额",
+      "domain": "征信报告",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "征信口径的负债总额（万元）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "指标名称",
+      "domain": "风险指标",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "风险指标名称",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "指标值",
+      "domain": "风险指标",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "指标取值（0-1 归一化）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "条款编号",
+      "domain": "监管规范",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "条款唯一编号，如 银保监发〔2024〕12号-§3.2",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "文件名称",
+      "domain": "监管规范",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "规范性文件的完整名称",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "条款原文",
+      "domain": "监管条款",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "条款的完整原文",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "条款明确程度",
+      "domain": "监管条款",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "条款措辞的确定性（0-1），直接决定推导边权重",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "适用对象",
+      "domain": "监管条款",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "条款约束的对象类型",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "发文机关",
+      "domain": "监管规范",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "规范性文件的发文机关",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "生效日期",
+      "domain": "监管规范",
+      "range": "date",
+      "kind": "datatype",
+      "definition": "规范性文件的生效日期",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "date"
+    },
+    {
+      "name": "维度名称",
+      "domain": "风险维度",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "风险维度名称",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "维度权重",
+      "domain": "风险维度",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "该维度在综合评分中的权重",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "阈值名称",
+      "domain": "阈值",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "阈值名称",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "阈值",
+      "domain": "阈值",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "阈值数值",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "比较方向",
+      "domain": "阈值",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "高于/低于触发",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "决策编号",
+      "domain": "决策",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "决策唯一编号",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "决策时点",
+      "domain": "决策",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "决策生成时间戳",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "决策类型",
+      "domain": "决策",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "授信/合规/预警",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "结论",
+      "domain": "决策",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "决策的最终结论",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "步骤序号",
+      "domain": "推理步骤",
+      "range": "integer",
+      "kind": "datatype",
+      "definition": "步骤在决策中的执行序号",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "integer"
+    },
+    {
+      "name": "操作",
+      "domain": "推理步骤",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "该步骤执行的操作名",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "路径编号",
+      "domain": "路径记录",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "路径唯一编号",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "跳数",
+      "domain": "路径记录",
+      "range": "integer",
+      "kind": "datatype",
+      "definition": "路径的边数",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "integer"
+    },
+    {
+      "name": "置信度",
+      "domain": "路径记录",
+      "range": "float",
+      "kind": "datatype",
+      "definition": "路径的传播置信度（0-1）",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "float"
+    },
+    {
+      "name": "是否采纳",
+      "domain": "路径记录",
+      "range": "boolean",
+      "kind": "datatype",
+      "definition": "该路径是否进入最终结论",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "boolean"
+    },
+    {
+      "name": "拒绝原因",
+      "domain": "被拒路径",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "路径被排除的具体原因",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "候选文本",
+      "domain": "UNK候选",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "未能归类的原始提及文本",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "观测次数",
+      "domain": "UNK候选",
+      "range": "integer",
+      "kind": "datatype",
+      "definition": "该候选被观测到的次数",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "integer"
+    },
+    {
+      "name": "首次观测",
+      "domain": "UNK候选",
+      "range": "date",
+      "kind": "datatype",
+      "definition": "首次被观测到的日期",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "date"
+    },
+    {
+      "name": "来源文档",
+      "domain": "UNK候选",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "观测到该候选的文档标识",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": null,
+      "max_cardinality": null,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "提案编号",
+      "domain": "本体提案",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "提案唯一编号",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "动作",
+      "domain": "本体提案",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "提案的本体编辑动作",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    },
+    {
+      "name": "版本号",
+      "domain": "本体版本",
+      "range": "string",
+      "kind": "datatype",
+      "definition": "语义化版本号",
+      "inverse": null,
+      "functional": false,
+      "min_cardinality": 1,
+      "max_cardinality": 1,
+      "aliases": [],
+      "rdfs_range": "string"
+    }
+  ],
+  "history": [
+    {
+      "from_version": "0.1.0",
+      "to_version": "0.2.0",
+      "edits": [
+        {
+          "action": "add_alias",
+          "class_name": "社保缴纳记录",
+          "alias": "社保缴纳记录信息"
+        }
+      ],
+      "rationale": "社保缴纳记录信息(prop:aaeb94821b8a)",
+      "actor": "auto"
+    }
+  ],
+  "provenance": {
+    "name": "GovFin 跨域信贷决策本体",
+    "description": "覆盖金融授信与政务数据两大域，支撑跨文档多跳推理与决策溯源",
+    "seed_class_count": 49,
+    "seed_property_count": 102
+  }
+}
