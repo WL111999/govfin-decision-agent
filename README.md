@@ -30,7 +30,7 @@
 | ④ "检索—推理"双驱动协同执行流 | 四阶段编排：检索 → 推理 → 决策 → 溯源；阶段间传**证据**而非摘要 | A2A `message/send` 实测返回完整编排日志（8 步） |
 | ⑤ 跨文档多跳推理与**可追溯决策链** | 修正衰减置信度模型（`geo × hop × btn`）+ 约束路径搜索 + Layer3 决策快照 + **依据漂移检测** | 样例主体：7 条采纳链、0 条被拒链、逐环证据可回指 `record:4/缴纳状态` |
 | ⑥ 可复用、快速部署的 Skill 模板 | 3 份 Skill（真实性核验 / 风险传导扫描 / 决策链生成），含 `allowed-tools`、适用与**不适用**边界、示例 | `nexent/skills/*/SKILL.md`；`dist/*.zip` 可直接导入 Nexent |
-| ⑦ 必须能在 Nexent 平台运行 | 容器化部署件 + 网络接入说明 + MCP 按 URL 注册路径 | `deploy/`（见 `deploy/README.md`） |
+| ⑦ 必须能在 Nexent 平台运行 | 容器化部署件 + 一键注册脚本；已在 Nexent v2.6.0 全量部署上打通 | `deploy/`、`scripts/register_to_nexent.py` |
 
 ## 三、快速开始（不需要任何外部依赖）
 
