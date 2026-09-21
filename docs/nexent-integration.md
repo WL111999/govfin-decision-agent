@@ -232,6 +232,51 @@ kg_path_query  evidence_bundle  risk_decision  ontology_status  ontology_evolve 
 
 与 `deploy/mcp_config.json` 的 `expectedTools` 及三份 SKILL.md 的 `allowed-tools` 一致。
 
-### 界面入口
+### 界面入口：为什么必须建租户
 
-`http://localhost:3000`，超管账号在部署时自动创建（部署日志里会打印邮箱与密码）。
+`http://localhost:3000`。但**别用部署时自动创建的 `suadmin` 登录去看集成效果**——
+那个账号里什么都看不到，而这**不是故障，是设计**。
+
+Nexent 是多租户架构，智能体开发界面全部活在**租户内部**。`suadmin` 是**平台管理员**：
+
+| | suadmin（平台管理员） | 租户管理员 |
+|---|---|---|
+| `user_role` | `SU` | `ADMIN` |
+| `tenant_id` | `"tenant_id"`（占位符，无真实租户） | 真实 UUID |
+| `accessibleRoutes` | `/`、`/resource-manage`、`/space`（**3 项**） | `/agents`、`/mcp-space`、`/knowledges`…（**17 项**） |
+| 典型权限 | `tenant:create`、`group:create`、`agent:read` | 含 `agent:create` 等开发权限 |
+
+权限清单最能说明问题：suadmin 有 `agent:read` 和 `agent:delete`，**却没有 `agent:create`**
+——管理员能看能删，不能建。它的职责是"开公司"（建租户、建用户组、分配资源），
+不是"干活"。
+
+所以要让赛题要求⑦"能在 Nexent 平台上运行"真正可演示，必须走完 Nexent 设计的正常流程：
+
+```
+平台管理员建租户 → 发管理员邀请码 → 被邀请人注册成租户用户
+```
+
+这一步由 `scripts/provision_tenant.py` 自动完成（幂等，可重复跑）：
+
+```bash
+python -X utf8 scripts/provision_tenant.py
+```
+
+跑完会打印租户账号与密码。**用那个账号登录**，侧边栏才会展开智能体 / MCP 工具 /
+技能等完整菜单。
+
+注意一个容易踩的细节：注册邮箱**不能用 `.local` 这类保留域名**，校验层会直接拒掉
+（`special-use or reserved name`）。所以默认值用的是 `govfin@nexent-demo.com`。
+
+### 租户内的注册结果
+
+| 项 | 结果 |
+|---|---|
+| 租户 | `GovFin 演示租户` |
+| 用户角色 | `ADMIN`，可访问 17 条路由 |
+| MCP 服务 | `govfin-decision`，`enabled=true`，**权限 `EDIT`** |
+| Nexent 发现的工具 | **10 个**（全部） |
+| Skill | 3 份，全部导入 |
+
+权限是 `EDIT` 而不是 `READ_ONLY` 这一点值得留意：注册时用的是租户管理员身份，
+所以这个租户能编辑、停用、重连这个 MCP 服务，而不只是只读引用。
