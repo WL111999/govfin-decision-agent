@@ -194,6 +194,26 @@ const STEPS = [
 ];
 let cur = 0;
 
+/* 双击打开这个 HTML 文件时（file:// 协议），fetch('/api/...') 必然失败，
+   因为相对路径在没有服务器的情况下无处可去，而浏览器的报错是
+   "Failed to parse URL from /api/status" —— 这句话读不出"你该用网址打开"。
+   所以直接检测协议，把该怎么做写在页面上。 */
+const IS_FILE_PROTOCOL = location.protocol === 'file:';
+const FILE_HINT = `
+  <div class="err">
+    <b>这个页面是直接用文件打开的，要访问 <code>http://localhost:8090</code> 才能用。</b><br><br>
+    地址栏现在显示的是 <code>file:///…</code>，说明文件被双击打开了。这个页面需要跟后端的
+    服务通信，而文件方式打开时没有服务器可以请求。<br><br>
+    请在浏览器地址栏输入：<br>
+    <code style="display:inline-block;margin-top:7px;padding:6px 12px">http://localhost:8090</code>
+  </div>`;
+
+function ifFileProtocol(box) {
+  if (!IS_FILE_PROTOCOL) return false;
+  box.innerHTML = FILE_HINT;
+  return true;
+}
+
 function renderSteps(){
   document.getElementById('steps').innerHTML = STEPS.map((s,i)=>
     `<div class="step ${i===cur?'on':''}" onclick="go(${i})"><span class="n">${s.n}</span>${s.t}</div>`
@@ -204,6 +224,7 @@ function go(i){
   document.querySelectorAll('[data-step]').forEach(el=>{
     el.classList.toggle('hidden', Number(el.dataset.step)!==i);
   });
+  if(IS_FILE_PROTOCOL) return;   // 各步的 load* 自己会给出提示
   if(i===0) loadStatus();
   if(i===2) loadKb();
   if(i===3) loadNexent();
@@ -212,6 +233,7 @@ function go(i){
 /* ---------- 状态 ---------- */
 async function loadStatus(btn){
   const box = document.getElementById('status');
+  if(ifFileProtocol(box)) return;
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>检查中'; }
   box.innerHTML = '<div class="empty">正在检查…</div>';
   try{
@@ -258,6 +280,7 @@ async function loadStatus(btn){
 async function runDecision(){
   const btn = document.getElementById('run');
   const box = document.getElementById('result');
+  if(ifFileProtocol(box)) return;
   const subject = document.getElementById('subject').value.trim();
   if(!subject){ box.innerHTML = '<div class="err">请先填写企业名称</div>'; return; }
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>推理中';
@@ -351,6 +374,7 @@ function renderDecision(d){
 /* ---------- 知识库 ---------- */
 async function loadKb(btn){
   const box = document.getElementById('kb');
+  if(ifFileProtocol(box)) return;
   if(btn){ btn.disabled=true; btn.textContent='读取中…'; }
   box.innerHTML = '<div class="empty">正在读取…</div>';
   try{
@@ -376,6 +400,7 @@ async function loadKb(btn){
 /* ---------- Nexent ---------- */
 async function loadNexent(btn){
   const box = document.getElementById('nexent');
+  if(ifFileProtocol(box)) return;
   if(btn){ btn.disabled=true; btn.textContent='读取中…'; }
   box.innerHTML = '<div class="empty">正在读取…</div>';
   try{
@@ -399,7 +424,8 @@ async function loadNexent(btn){
 }
 
 renderSteps();
-loadStatus();
+if(IS_FILE_PROTOCOL) ifFileProtocol(document.getElementById('status'));
+else loadStatus();
 </script>
 </body>
 </html>
