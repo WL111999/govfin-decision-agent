@@ -47,6 +47,17 @@ MCP_URL = "http://govfin-agent:8930/mcp"
 # 服务端日志里才看得到（返回体只说 "Agent import error."）。
 # display_name 不受这个限制，中文、连字符都行，用户看到的是它。
 AGENT_NAME = "govfin_credit_decision"
+
+# 导入包里的占位 agent_id，**必须是真值**（不能用 0）。
+#
+# Nexent 前端的校验写的是 `if (!agentData.agent_id || !agentData.agent_info)`，
+# 而 JavaScript 里 `!0 === true` —— agent_id 取 0 会被判成"格式错误"，
+# 报"文件类型错误，请检查JSON格式"，一句话都指不到真正的原因。
+#
+# 后端本身不在乎这个值（它只是拿 str(agent_id) 去 agent_info 里查表，导完再映射成
+# 新 id），所以 0 在 API 调用下完全正常 —— 这个坑只在界面导入时显形，
+# 而界面恰恰是用户实际会用的那条路。
+PLACEHOLDER_AGENT_ID = 1
 AGENT_DISPLAY_NAME = "跨域授信决策智能体"
 AGENT_DESCRIPTION = "金融+政务跨域授信决策：政务事实核验、财务解析、受约束多跳推理、授信决策合成与可追溯审计"
 
@@ -182,7 +193,7 @@ def fetch_tools(auth: dict) -> list[dict]:
 
 def build_agent_info(tools: list[dict], skill_names: list[str]) -> dict:
     return {
-        "agent_id": 0,
+        "agent_id": PLACEHOLDER_AGENT_ID,
         "tenant_id": None,
         "name": AGENT_NAME,
         "display_name": AGENT_DISPLAY_NAME,
@@ -206,6 +217,52 @@ def build_agent_info(tools: list[dict], skill_names: list[str]) -> dict:
             "查一下 丙建材有限公司 有没有行政处罚",
         ],
     }
+
+
+def ui_would_accept(payload: dict) -> list[str]:
+    """照着 Nexent **前端**的校验规则自查一遍，返回所有会被拒的理由。
+
+    为什么要单独做这件事：前端那几条判断散在 ``agentImportUtils.ts`` 里，而且
+    **报错文案指不到真正的原因**——统一都是"文件类型错误，请检查JSON格式"。
+
+    实测踩到的那个坑：前端写的是 ``if (!agentData.agent_id || ...)``，而
+    JavaScript 里 ``!0 === true``，所以 ``agent_id: 0`` 会被判成格式错误；
+    后端却完全接受 0（它只拿 ``str(agent_id)`` 去 ``agent_info`` 里查表）。
+    也就是说，**同一份文件 API 导得进去、界面导不进去**——而界面才是用户实际
+    会用的那条路。
+
+    在生成的那一刻先自查一遍，这类问题就会在构建时暴露，而不是等用户拖进去
+    看到一句没头没脑的报错。
+    """
+    problems: list[str] = []
+
+    # 对应 agentImportUtils.ts: `if (!agentData.agent_id || !agentData.agent_info)`
+    # Python 的假值语义与 JS 一致（0 都是假值），所以这里可以直接照搬。
+    if not payload.get("agent_id"):
+        problems.append("agent_id 是假值——0 在 JavaScript 里是假值，前端会判为格式错误")
+    if not payload.get("agent_info"):
+        problems.append("agent_info 为空")
+
+    info = payload.get("agent_info") or {}
+    for key, entry in info.items():
+        if not isinstance(entry, dict):
+            problems.append(f"agent_info[{key}] 不是对象")
+            continue
+        if not entry.get("name"):
+            problems.append(f"agent_info[{key}].name 为空")
+        if not entry.get("display_name"):
+            problems.append(f"agent_info[{key}].display_name 为空")
+        if not entry.get("tools"):
+            problems.append(f"agent_info[{key}].tools 为空——导进去会是个没有任何工具的智能体")
+
+    # 后端 import_agent_impl 从顶层 agent_id 出发，按 str(agent_id) 查 agent_info。
+    # 对不上就直接 KeyError，而对外只报一句 "Agent import error."
+    if info and str(payload.get("agent_id")) not in info:
+        problems.append(
+            f"顶层 agent_id={payload.get('agent_id')} 在 agent_info 里没有对应条目"
+            f"（现有键：{list(info)}）"
+        )
+    return problems
 
 
 def main() -> int:
@@ -254,12 +311,20 @@ def main() -> int:
 
     agent_info = build_agent_info(tools, skill_names)
     payload = {
-        "agent_id": 0,
-        "agent_info": {"0": agent_info},
+        "agent_id": PLACEHOLDER_AGENT_ID,
+        "agent_info": {str(PLACEHOLDER_AGENT_ID): agent_info},
         "mcp_info": [{"mcp_server_name": MCP_SERVER_NAME, "mcp_url": MCP_URL}],
         "business_logic_model_id": None,
         "business_logic_model_name": None,
     }
+
+    problems = ui_would_accept(payload)
+    if problems:
+        print("  ✗ 生成的包会被 Nexent 界面拒收，先修这些：")
+        for p in problems:
+            print(f"      - {p}")
+        return 1
+    print("  ✓ 通过 Nexent 前端校验规则自查")
 
     json_path = out_dir / f"{AGENT_DISPLAY_NAME}.json"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

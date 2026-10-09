@@ -120,6 +120,13 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         '                "nodes": 0,\n',
         "tests/test_mcp_a2a.py::test_ingest_document_actually_puts_material_on_the_graph",
     ),
+    (
+        "占位 agent_id 改回 0（界面会判成格式错误）",
+        "scripts/build_nexent_bundle.py",
+        "PLACEHOLDER_AGENT_ID = 1\n",
+        "PLACEHOLDER_AGENT_ID = 0\n",
+        "tests/test_nexent_bundle.py::test_placeholder_agent_id_is_truthy",
+    ),
 ]
 
 
