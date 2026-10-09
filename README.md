@@ -34,7 +34,12 @@
 
 ## 三、快速开始
 
-### 一条命令跑起来（推荐）
+### 桌面应用（推荐）
+
+双击 **`GovFin.exe`**（或 `python -X utf8 scripts/build_exe.py` 自己打包一个）。
+界面按「决策工作台 / 服务状态 / 部署与配置」分三页，**API Key 和一键部署都在里面**。
+
+### 一条命令跑起来（无界面）
 
 ```bash
 python -X utf8 scripts/one_click_deploy.py
@@ -143,12 +148,12 @@ python -X utf8 -m govfin.a2a.server --port 8940 --ingest data
 | 触发依据 | `连续异常月数上限` 观测 3 ≥ 阈值 3（条款 银保监发〔2024〕12号-§4.1） |
 | 采纳推理链 | 7 条（逐环带 `source_document` + `source_locator`） |
 | 依据漂移 | 0 项 |
-| 测试 | **258 条用例全部通过**（245 回归 + 13 规模压力） |
+| 测试 | **275 条用例全部通过**（262 回归 + 13 规模压力） |
 
 ## 六、测试
 
 ```bash
-python -X utf8 -m pytest -q              # 245 条，约 7 秒
+python -X utf8 -m pytest -q              # 262 条，约 7 秒
 python -X utf8 -m pytest -q -m stress    # 追加 13 条十万级规模压力
 ```
 
@@ -165,7 +170,7 @@ Dockerfile 里两处会让容器根本起不来的写法。
 
 详见 [`docs/测试报告.md`](docs/测试报告.md)，含每个缺陷的根因与**变异验证**结果
 （回退修复 → 断言测试必须变红；首轮 9 处变异有 2 处没被抓到，因此补了针对性用例，
-当前 17/17 全检出）。
+当前 23/23 全检出）。
 
 ## 七、目录
 
@@ -183,7 +188,7 @@ nexent/skills/  3 份 Skill 工作流模板 + 可直接导入的 zip
 deploy/         容器化部署件 · Nexent 接入配置
 docs/           架构 · 置信度模型 · 本体演化 · 决策溯源 · 测试报告
 data/           样例多模态数据集（含 OCR 边车）
-tests/          258 条用例
+tests/          275 条用例
 ```
 
 ## 八、文档
@@ -196,6 +201,7 @@ tests/          258 条用例
 | [`docs/provenance.md`](docs/provenance.md) | 决策溯源与依据漂移检测 |
 | [`docs/nexent-integration.md`](docs/nexent-integration.md) | Nexent 对接步骤（MCP 注册 + Skill 导入 + 同网部署） |
 | [`docs/一键部署与控制台.md`](docs/一键部署与控制台.md) | 一条命令部署、控制台五个步骤、拖拽导入、本地向量化服务 |
+| [`docs/桌面应用.md`](docs/桌面应用.md) | 原生窗口、决策过程可视化、七个独立按钮、应用内一键部署 |
 | [`docs/测试报告.md`](docs/测试报告.md) | 暴力测试全过程与缺陷清单 |
 
 ## 九、诚实的边界

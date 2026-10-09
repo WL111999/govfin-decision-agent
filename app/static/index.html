@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GovFin 决策工作台</title>
+<style>
+/* ===========================================================================
+   深色科技风。三个决定：
+   1. 只有一种强调色（青蓝）+ 三种状态色（绿/黄/红）。颜色多了会让人以为颜色
+      本身在传递信息，而这里真正要传递的只有"这一步现在怎么了"。
+   2. 动效只用在**状态变化**上（执行中/完成/触发），不做常驻动画。
+      一直在动的东西会让人分不清"它是不是卡住了"。
+   3. 决策页深色、其余两页也是深色——原计划保留浅色做对比，但应用是整窗的，
+      混搭会让人以为切错了地方。要对比就靠"分析模式"里更密的动效来区分。
+   =========================================================================== */
+:root{
+  --bg:#080b14; --bg-2:#0d1220;
+  --panel:#111827; --panel-2:#161d31; --panel-3:#1c2440;
+  --line:#232d48;
+  --ink:#e9eefb; --ink-2:#98a3bd; --ink-3:#5d6884;
+  --accent:#4d8dff; --accent-2:#22d3ee;
+  --ok:#2dd4a7; --warn:#fbbf24; --bad:#ff4d6d;
+  --glow:rgba(77,141,255,.45);
+  --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--ink); overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#26314f;border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:#33406a}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---- 骨架 ---- */
+.shell{display:flex;flex-direction:column;height:100vh}
+header{
+  display:flex;align-items:center;gap:20px;padding:0 22px;height:56px;flex:none;
+  background:linear-gradient(180deg,#0e1424,#0b101c);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;letter-spacing:.02em}
+.brand .mark{
+  width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:14px;font-weight:700;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#06101f;
+  box-shadow:0 0 18px var(--glow);
+}
+.tabs{display:flex;gap:4px;margin-left:auto}
+.tab{
+  padding:7px 17px;border-radius:9px;font-size:13.5px;color:var(--ink-2);
+  cursor:pointer;transition:.16s;border:1px solid transparent;user-select:none;
+}
+.tab:hover{color:var(--ink);background:#151d33}
+.tab.on{color:#fff;background:#1b2440;border-color:#2b3a61;box-shadow:0 0 0 1px rgba(77,141,255,.14) inset}
+.tab .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--bad);margin-left:7px;vertical-align:1px}
+.tab .dot.hide{display:none}
+
+main{flex:1;overflow:auto;position:relative}
+.page{display:none;padding:20px 22px 40px}
+.page.on{display:block}
+
+/* ---- 通用件 ---- */
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;margin-bottom:16px;
+}
+.card h2{font-size:15px;font-weight:600;margin-bottom:4px;letter-spacing:.01em}
+.card .lead{color:var(--ink-2);font-size:13px;margin-bottom:16px}
+h3{font-size:13px;font-weight:600;color:var(--ink-2);text-transform:none;letter-spacing:.03em;margin:18px 0 10px}
+label{display:block;font-size:12.5px;color:var(--ink-3);margin-bottom:6px}
+input,select{
+  width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:10px;
+  background:#0c1120;color:var(--ink);font:inherit;transition:.15s;
+}
+input:focus,select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px rgba(77,141,255,.13)}
+input::placeholder{color:#3f4a66}
+button{
+  padding:9px 18px;border:0;border-radius:10px;font:inherit;font-weight:500;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),#3d7ae8);color:#fff;transition:.16s;
+}
+button:hover:not(:disabled){filter:brightness(1.12);box-shadow:0 4px 20px rgba(77,141,255,.3)}
+button:disabled{opacity:.42;cursor:not-allowed;filter:grayscale(.5)}
+button.ghost{background:#151d33;color:var(--ink-2);border:1px solid var(--line)}
+button.ghost:hover:not(:disabled){background:#1b2440;color:var(--ink);box-shadow:none;filter:none}
+button.tiny{padding:6px 13px;font-size:12.5px;border-radius:8px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.hint{font-size:12px;color:var(--ink-3);line-height:1.75}
+code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;color:#9fc4ff}
+.err{
+  background:rgba(255,77,109,.09);border:1px solid rgba(255,77,109,.3);color:#ff98ab;
+  padding:12px 15px;border-radius:10px;font-size:13px;margin-top:14px;
+}
+.ok-box{background:rgba(45,212,167,.08);border:1px solid rgba(45,212,167,.28);color:#7fe6c6;
+  padding:12px 15px;border-radius:10px;font-size:13px;margin-top:14px}
+.empty{color:var(--ink-3);font-size:13px;padding:24px 0;text-align:center}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.25);
+  border-top-color:#fff;border-radius:50%;animation:spin .66s linear infinite;vertical-align:-1px;margin-right:7px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---- 决策工作台 ---- */
+.searchbar{display:flex;gap:10px;margin-bottom:16px}
+.searchbar input{flex:1;padding:13px 16px;font-size:15px}
+.searchbar button{padding:13px 28px;font-size:14.5px}
+
+/* 舞台：canvas 画连线与粒子，按钮浮在上面。
+   两者分开是为了让文字能被选中复制——canvas 里的字选不了。 */
+.stage{position:relative;height:380px;margin-bottom:6px;
+  background:radial-gradient(ellipse at 50% 0%,#0f1729 0%,#0a0e1a 70%);
+  border:1px solid var(--line);border-radius:var(--radius,14px);overflow:hidden}
+#viz{position:absolute;inset:0;width:100%;height:100%}
+
+.node{
+  position:absolute;transform:translate(-50%,-50%);
+  min-width:136px;padding:12px 14px;border-radius:12px;cursor:pointer;
+  background:rgba(22,29,49,.9);border:1px solid #26314f;
+  transition:.2s cubic-bezier(.4,0,.2,1);user-select:none;
+  backdrop-filter:blur(6px);
+}
+.node:hover{border-color:#3a4a75;transform:translate(-50%,-50%) translateY(-2px)}
+.node .ic{font-size:16px;line-height:1;margin-bottom:6px;display:block;filter:grayscale(.55) opacity(.6);transition:.3s}
+.node .nm{font-size:13px;font-weight:500;color:var(--ink-2);transition:.3s;white-space:nowrap}
+.node .st{font-size:11px;color:var(--ink-3);margin-top:3px;min-height:15px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.node .badge{
+  position:absolute;top:-6px;right:-6px;width:9px;height:9px;border-radius:50%;
+  background:#33405f;border:2px solid var(--bg);transition:.3s;
+}
+
+/* 四态。用 glow 而不是改背景色：背景一改，卡片之间的层级感就乱了 */
+.node.running{border-color:var(--accent);box-shadow:0 0 0 1px rgba(77,141,255,.35),0 0 26px rgba(77,141,255,.32);
+  animation:breathe 1.5s ease-in-out infinite}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 1px rgba(77,141,255,.3),0 0 18px rgba(77,141,255,.2)}
+                   50%{box-shadow:0 0 0 1px rgba(77,141,255,.55),0 0 34px rgba(77,141,255,.5)}}
+.node.running .ic{filter:none;opacity:1}
+.node.running .nm{color:#fff}
+.node.running .badge{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.node.done{border-color:rgba(45,212,167,.45)}
+.node.done .ic{filter:none;opacity:1}
+.node.done .nm{color:var(--ink)}
+.node.done .badge{background:var(--ok);box-shadow:0 0 10px rgba(45,212,167,.7)}
+.node.fail{border-color:rgba(255,77,109,.5)}
+.node.fail .nm{color:#ffb3c1}
+.node.fail .badge{background:var(--bad);box-shadow:0 0 10px rgba(255,77,109,.7)}
+.node.locked{opacity:.45;cursor:not-allowed}
+.node.locked:hover{transform:translate(-50%,-50%)}
+.node.active{border-color:var(--accent-2);box-shadow:0 0 0 1px rgba(34,211,238,.4),0 0 22px rgba(34,211,238,.25)}
+
+/* 结果面板 */
+.results{margin-top:18px}
+.rpanel{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  margin-bottom:12px;overflow:hidden;animation:slideIn .34s cubic-bezier(.2,.8,.3,1)
+}
+@keyframes slideIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.rhead{display:flex;align-items:center;gap:10px;padding:13px 18px;
+  background:var(--panel-2);border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+.rhead .ic{font-size:15px}
+.rhead .tt{font-weight:500;font-size:13.5px}
+.rhead .ms{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.rhead .caret{color:var(--ink-3);font-size:11px;transition:.2s}
+.rpanel.folded .caret{transform:rotate(-90deg)}
+.rpanel.folded .rbody{display:none}
+.rbody{padding:16px 18px}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:13px;margin:10px 0}
+.kv dt{color:var(--ink-3);font-size:12.5px;white-space:nowrap}
+.kv dd{color:var(--ink)}
+
+.rec{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:11px 14px;margin-bottom:8px}
+.rec .rl{font-size:12.5px;color:var(--ink-2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{font-size:11px;padding:1.5px 8px;border-radius:20px;background:#1e2842;color:var(--ink-2)}
+.pill.ok{background:rgba(45,212,167,.14);color:#5fe0b8}
+.pill.warn{background:rgba(251,191,36,.14);color:#f3cd66}
+.pill.bad{background:rgba(255,77,109,.14);color:#ff8fa3}
+
+/* 结论卡 */
+.verdict{
+  display:flex;align-items:center;gap:26px;padding:22px 26px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(255,77,109,.09),rgba(255,77,109,.02));
+  border:1px solid rgba(255,77,109,.28);margin-bottom:16px;
+}
+.verdict.good{background:linear-gradient(135deg,rgba(45,212,167,.09),transparent);border-color:rgba(45,212,167,.28)}
+.verdict.mid{background:linear-gradient(135deg,rgba(251,191,36,.1),transparent);border-color:rgba(251,191,36,.3)}
+.verdict .big{font-size:26px;font-weight:600;letter-spacing:.01em}
+.verdict .sub{color:var(--ink-2);font-size:12.5px;margin-top:2px}
+
+/* 置信度环 */
+.gauge{position:relative;width:86px;height:86px;flex:none}
+.gauge svg{transform:rotate(-90deg)}
+.gauge .val{position:absolute;inset:0;display:grid;place-items:center;
+  font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* 阈值条 */
+.thr{margin-top:14px}
+.thr .lbl{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-2);margin-bottom:7px}
+.thr .bar{height:9px;border-radius:5px;background:#1a2238;overflow:hidden;position:relative}
+.thr .fill{height:100%;width:0;border-radius:5px;transition:width 1.05s cubic-bezier(.3,.9,.3,1);
+  background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.thr.hit .fill{background:linear-gradient(90deg,#ff8a3d,var(--bad));box-shadow:0 0 16px rgba(255,77,109,.55)}
+.thr.hit .lbl{color:#ff9aae}
+.thr .mark{position:absolute;top:-3px;width:2px;height:15px;background:var(--ink-3);border-radius:1px}
+
+/* 证据链 */
+.chain{border-left:2px solid #24304d;padding:2px 0 2px 15px;margin:12px 0;position:relative}
+.chain::before{content:'';position:absolute;left:-5px;top:8px;width:8px;height:8px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 9px var(--glow)}
+.chain .ch{font-size:13px;font-weight:500;margin-bottom:5px}
+.chain .meta{font-size:11.5px;color:var(--ink-3);margin-bottom:7px;font-variant-numeric:tabular-nums}
+.hop{font-size:12.5px;color:var(--ink-2);padding:5px 0 5px 13px;border-left:1px solid #1f2940;
+  margin-left:4px;position:relative}
+.hop::before{content:'';position:absolute;left:-3.5px;top:12px;width:6px;height:6px;border-radius:50%;background:#2c3a5c}
+.hop .src{color:var(--ink-3);font-size:11.5px}
+
+/* ---- 状态页 ---- */
+.srow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #1a2233}
+.srow:last-child{border-bottom:0}
+.led{width:8px;height:8px;border-radius:50%;flex:none;background:#33405f}
+.led.ok{background:var(--ok);box-shadow:0 0 9px rgba(45,212,167,.75)}
+.led.bad{background:var(--bad);box-shadow:0 0 9px rgba(255,77,109,.75)}
+.led.warn{background:var(--warn);box-shadow:0 0 9px rgba(251,191,36,.7)}
+.srow .nm{font-weight:500;min-width:104px}
+.srow .vl{margin-left:auto;color:var(--ink-2);font-size:12.5px;text-align:right}
+
+/* ---- 部署页 ---- */
+.deck{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px}
+.stat{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:15px 17px}
+.stat .t{font-size:12px;color:var(--ink-3);margin-bottom:7px}
+.stat .v{font-size:16px;font-weight:500}
+.stat .d{font-size:12px;color:var(--ink-3);margin-top:5px;line-height:1.6}
+.log{
+  background:#070a12;border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+  font:12px/1.75 ui-monospace,Menlo,Consolas,monospace;color:#8fa4c8;
+  max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-all;
+}
+.log .l-ok{color:#5fe0b8}
+.log .l-bad{color:#ff8fa3}
+.log .l-hd{color:#9fc4ff;font-weight:500}
+.drop{
+  border:1.5px dashed var(--line);border-radius:12px;padding:26px;text-align:center;
+  transition:.18s;cursor:pointer;background:var(--panel-2);
+}
+.drop:hover{border-color:#3a4a75}
+.drop.over{border-color:var(--accent);background:rgba(77,141,255,.07)}
+.drop .big{font-size:14px;font-weight:500;margin-bottom:5px}
+.drop .sub{font-size:12px;color:var(--ink-3);line-height:1.8}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="brand"><span class="mark">G</span>GovFin 决策工作台</div>
+    <div class="tabs">
+      <div class="tab on" data-page="work">决策工作台</div>
+      <div class="tab" data-page="status">服务状态<span class="dot hide" id="tabDot"></span></div>
+      <div class="tab" data-page="deploy">部署与配置</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ================= 决策工作台 ================= -->
+    <section class="page on" id="page-work">
+      <div class="searchbar">
+        <input id="subject" value="乙贸易有限公司" placeholder="企业名称或统一社会信用代码" autocomplete="off">
+        <button id="btnRun" onclick="runAll()">开始分析</button>
+      </div>
+
+      <div class="stage" id="stage">
+        <canvas id="viz"></canvas>
+        <!-- 节点按钮由 JS 按 STEPS 生成，位置写在这里 -->
+      </div>
+      <p class="hint" style="margin:10px 2px 0">
+        每个节点都可以<b>单独点击</b>执行——只看行政处罚就不必等整套决策链跑完。
+        「依据回执」需要先跑一次「决策合成」拿到决策编号。
+      </p>
+
+      <div class="results" id="results"></div>
+    </section>
+
+    <!-- ================= 服务状态 ================= -->
+    <section class="page" id="page-status">
+      <div class="card">
+        <h2>服务状态</h2>
+        <p class="lead">四块服务有一块没起来，后面的步骤就会失败。</p>
+        <div id="statusBody"><div class="empty">正在检查…</div></div>
+        <div class="row" style="margin-top:16px"><button class="ghost" onclick="loadStatus(1)">重新检查</button></div>
+      </div>
+
+      <div class="card">
+        <h2>导入材料</h2>
+        <p class="lead">结构化数据进图谱（可推理的事实），制度文本进知识库（检索用）。</p>
+        <div class="drop" id="drop">
+          <div class="big">拖文件到这里，或点击选择</div>
+          <div class="sub">
+            <b>.json / .csv → 知识图谱</b>　工商登记、社保记录、行政处罚<br>
+            <b>.txt / .pdf / 图片 → 知识库</b>　监管条款、征信报告、判决书
+          </div>
+          <input type="file" id="fileInput" multiple style="display:none"
+                 accept=".json,.csv,.txt,.pdf,.png,.jpg,.jpeg">
+        </div>
+        <div id="uploadRes"></div>
+      </div>
+    </section>
+
+    <!-- ================= 部署与配置 ================= -->
+    <section class="page" id="page-deploy">
+      <div class="card">
+        <h2>项目目录</h2>
+        <p class="lead">Docker 构建要用项目当上下文，API Key 也写在项目里。</p>
+        <div id="projBody"><div class="empty">正在读取…</div></div>
+        <div class="row" style="margin-top:14px">
+          <input id="projPath" placeholder="例如 D:\桌面\govfin-decision-agent" style="flex:1">
+          <button class="ghost" onclick="saveProject()">保存目录</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>大模型 API Key</h2>
+        <p class="lead">保存后会写入项目 <code>.env</code>，并可以一键注册到 Nexent 的模型列表。</p>
+        <div class="row" style="gap:12px;align-items:flex-end">
+          <div style="flex:1;min-width:220px">
+            <label for="keyInput">API Key</label>
+            <input id="keyInput" type="password" placeholder="留空表示不修改已保存的 Key">
+          </div>
+          <div style="flex:1;min-width:200px">
+            <label for="modelInput">模型</label>
+            <input id="modelInput" value="deepseek-chat">
+          </div>
+          <div style="flex:1.4;min-width:240px">
+            <label for="baseInput">接口地址</label>
+            <input id="baseInput" value="https://api.deepseek.com/v1">
+          </div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button onclick="saveKey()">保存</button>
+          <button class="ghost" onclick="testKey()">测试连通性</button>
+          <button class="ghost" onclick="registerModels()">注册到 Nexent</button>
+        </div>
+        <div id="keyRes"></div>
+      </div>
+
+      <div class="card">
+        <h2>一键部署</h2>
+        <p class="lead">检查 Docker → 构建镜像 → 启动容器 → 接入 Nexent。已经做过的会跳过。</p>
+        <div id="deployStats" class="deck"></div>
+        <div class="row" style="margin-bottom:14px">
+          <button onclick="startDeploy(false)">开始部署</button>
+          <button class="ghost" onclick="startDeploy(true)">强制重建镜像</button>
+          <button class="ghost" onclick="launchDocker()">启动 Docker Desktop</button>
+          <button class="ghost" onclick="refreshDeploy()">刷新状态</button>
+        </div>
+        <div class="log hidden" id="deployLog"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ===========================================================================
+   一、常量与状态
+   =========================================================================== */
+
+const STEP_POS = {           // 百分比坐标。改这里就能重排版面。
+  lookup:   [ 10, 50],
+  social:   [ 36, 16],
+  judicial: [ 36, 50],
+  finance:  [ 36, 84],
+  graph:    [ 61, 50],
+  decide:   [ 79, 50],
+  evidence: [ 93, 50],
+};
+const EDGES = [
+  ['lookup','social'], ['lookup','judicial'], ['lookup','finance'],
+  ['social','graph'], ['judicial','graph'], ['finance','graph'],
+  ['graph','decide'], ['decide','evidence'],
+];
+
+const COLORS = { idle:'#33405f', running:'#4d8dff', done:'#2dd4a7', fail:'#ff4d6d' };
+
+let STEPS = {};              // id -> 元信息（后端给）
+let state = {};              // id -> {status, summary, data, elapsed, error}
+let decisionId = null;
+
+const $ = s => document.querySelector(s);
+const isFile = location.protocol === 'file:';
+
+/* ===========================================================================
+   二、标签切换
+   =========================================================================== */
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+    document.querySelectorAll('.page').forEach(p =>
+      p.classList.toggle('on', p.id === 'page-' + t.dataset.page));
+    if (t.dataset.page === 'status') loadStatus();
+    if (t.dataset.page === 'deploy') { loadProject(); loadKeyConfig(); refreshDeploy(); }
+  };
+});
+
+/* ===========================================================================
+   三、可视化引擎
+
+   一个 canvas 画三样东西：连线、粒子、涟漪。按钮是 DOM，浮在上面。
+   这样分工的理由：文字要能选中复制（DOM），而每帧都变的像素不该进 DOM（canvas）。
+   =========================================================================== */
+
+const viz = {
+  cv: null, ctx: null, w: 0, h: 0, dpr: 1,
+  nodes: {},                 // id -> {x, y, ripple: 0..1}
+  edges: {},                 // "a>b" -> {progress: 0..1, flow: 0..1, active: bool}
+  particles: [],
+  t: 0,
+};
+
+function initViz() {
+  viz.cv = $('#viz');
+  viz.ctx = viz.cv.getContext('2d');
+  resizeViz();
+  window.addEventListener('resize', resizeViz);
+  requestAnimationFrame(tick);
+}
+
+function resizeViz() {
+  const r = $('#stage').getBoundingClientRect();
+  viz.dpr = window.devicePixelRatio || 1;
+  viz.w = r.width; viz.h = r.height;
+  viz.cv.width = viz.w * viz.dpr;
+  viz.cv.height = viz.h * viz.dpr;
+  viz.ctx.setTransform(viz.dpr, 0, 0, viz.dpr, 0, 0);
+  for (const [id, [px, py]] of Object.entries(STEP_POS)) {
+    viz.nodes[id] = { x: viz.w * px / 100, y: viz.h * py / 100, ripple: 0 };
+  }
+}
+
+function edgeKey(a, b) { return a + '>' + b; }
+
+function tick() {
+  viz.t += 0.016;
+  const c = viz.ctx;
+  c.clearRect(0, 0, viz.w, viz.h);
+
+  drawGrid(c);
+
+  // 连线
+  for (const [a, b] of EDGES) {
+    const e = viz.edges[edgeKey(a, b)] || { progress: 0, active: false };
+    if (e.progress <= 0.001) continue;
+    drawEdge(c, a, b, e);
+  }
+
+  // 粒子
+  const alive = [];
+  for (const p of viz.particles) {
+    p.t += p.speed;
+    if (p.t > 1) { continue; }
+    const A = viz.nodes[p.a], B = viz.nodes[p.b];
+    if (!A || !B) continue;
+    // easeInOut 让粒子在两端慢、中间快，看起来像被"吸"过去
+    const k = p.t < .5 ? 2*p.t*p.t : 1 - Math.pow(-2*p.t+2, 2)/2;
+    const x = A.x + (B.x - A.x) * k, y = A.y + (B.y - A.y) * k;
+    const fade = Math.sin(p.t * Math.PI);
+    c.beginPath();
+    c.arc(x, y, p.r, 0, Math.PI * 2);
+    c.fillStyle = p.color;
+    c.globalAlpha = fade * 0.9;
+    c.shadowBlur = 12; c.shadowColor = p.color;
+    c.fill();
+    c.shadowBlur = 0; c.globalAlpha = 1;
+    alive.push(p);
+  }
+  viz.particles = alive.slice(-260);
+
+  // 涟漪
+  for (const n of Object.values(viz.nodes)) {
+    if (n.ripple <= 0) continue;
+    n.ripple -= 0.018;
+    if (n.ripple <= 0) { n.ripple = 0; continue; }
+    const p = 1 - n.ripple;
+    c.beginPath();
+    c.arc(n.x, n.y, 26 + p * 62, 0, Math.PI * 2);
+    c.strokeStyle = COLORS.done;
+    c.globalAlpha = n.ripple * 0.5;
+    c.lineWidth = 2;
+    c.stroke();
+    c.globalAlpha = 1;
+  }
+
+  requestAnimationFrame(tick);
+}
+
+function drawGrid(c) {
+  const step = 34;
+  c.strokeStyle = 'rgba(77,141,255,.045)';
+  c.lineWidth = 1;
+  const off = (viz.t * 6) % step;
+  c.beginPath();
+  for (let x = -off; x < viz.w; x += step) { c.moveTo(x, 0); c.lineTo(x, viz.h); }
+  for (let y = -off; y < viz.h; y += step) { c.moveTo(0, y); c.lineTo(viz.w, y); }
+  c.stroke();
+}
+
+function drawEdge(c, a, b, e) {
+  const A = viz.nodes[a], B = viz.nodes[b];
+  if (!A || !B) return;
+  const done = state[a] && state[a].status === 'done';
+  const color = e.active ? COLORS.running : (done ? COLORS.done : COLORS.idle);
+
+  // 贝塞尔而不是直线：三路汇聚到 graph 时直线会糊成一团
+  const mx = (A.x + B.x) / 2;
+  const c1x = mx, c1y = A.y, c2x = mx, c2y = B.y;
+
+  c.beginPath();
+  c.moveTo(A.x, A.y);
+  c.bezierCurveTo(c1x, c1y, c2x, c2y, B.x, B.y);
+  c.strokeStyle = color;
+  c.globalAlpha = e.active ? .55 : (done ? .34 : .13);
+  c.lineWidth = e.active ? 1.8 : 1.2;
+  if (e.active) { c.shadowBlur = 10; c.shadowColor = COLORS.running; }
+  c.stroke();
+  c.shadowBlur = 0; c.globalAlpha = 1;
+
+  // 沿着曲线爬的小光点，标示"流到这里了"
+  if (e.progress < 1 && e.progress > 0) {
+    const k = e.progress;
+    const px = bez(A.x,c1x,c2x,B.x,k), py = bez(A.y,c1y,c2y,B.y,k);
+    c.beginPath();
+    c.arc(px, py, 3, 0, Math.PI*2);
+    c.fillStyle = '#bfe0ff';
+    c.shadowBlur = 14; c.shadowColor = COLORS.running;
+    c.fill(); c.shadowBlur = 0;
+  }
+}
+const bez = (p0,p1,p2,p3,t) =>
+  Math.pow(1-t,3)*p0 + 3*Math.pow(1-t,2)*t*p1 + 3*(1-t)*t*t*p2 + t*t*t*p3;
+
+function animateEdge(a, b, to, ms = 620) {
+  const k = edgeKey(a, b);
+  const e = viz.edges[k] || (viz.edges[k] = { progress: 0, active: false });
+  const from = e.progress;
+  const t0 = performance.now();
+  e.active = to > from;
+  (function step(now) {
+    const p = Math.min(1, (now - t0) / ms);
+    e.progress = from + (to - from) * p;
+    if (p < 1) requestAnimationFrame(step);
+    else if (to >= 1) { e.active = false; emitParticles(a, b); }
+  })(t0);
+}
+
+function emitParticles(a, b, n = 16) {
+  const color = COLORS.done;
+  for (let i = 0; i < n; i++) {
+    viz.particles.push({
+      a, b, t: -i * 0.045, speed: 0.011 + Math.random() * 0.006,
+      r: 1.6 + Math.random() * 1.5, color,
+    });
+  }
+}
+
+function ripple(id) {
+  const n = viz.nodes[id];
+  if (n) n.ripple = 1;
+}
+
+/* ===========================================================================
+   四、步骤按钮
+   =========================================================================== */
+
+async function loadSteps() {
+  if (isFile) return;
+  try {
+    const r = await fetch('/api/steps');
+    const d = await r.json();
+    STEPS = {};
+    d.steps.forEach(s => STEPS[s.id] = s);
+    renderNodes();
+  } catch (e) { /* 服务没起来时静默；状态页会说明 */ }
+}
+
+function renderNodes() {
+  const stage = $('#stage');
+  stage.querySelectorAll('.node').forEach(n => n.remove());
+  for (const [id, [px, py]] of Object.entries(STEP_POS)) {
+    const s = STEPS[id];
+    if (!s) continue;
+    const el = document.createElement('div');
+    el.className = 'node';
+    el.id = 'node-' + id;
+    el.style.left = px + '%';
+    el.style.top = py + '%';
+    el.innerHTML = `<span class="ic">${s.icon}</span>
+      <span class="nm">${s.label}</span>
+      <span class="st"></span>
+      <span class="badge"></span>`;
+    el.title = s.desc + '\n工具：' + s.tool;
+    el.onclick = () => runStep(id);
+    stage.appendChild(el);
+    state[id] = state[id] || { status: 'idle' };
+  }
+  refreshNodes();
+}
+
+function refreshNodes() {
+  for (const id of Object.keys(STEP_POS)) {
+    const el = document.getElementById('node-' + id);
+    if (!el) continue;
+    const st = state[id] || { status: 'idle' };
+    const locked = (STEPS[id]?.needs || []).includes('decision_id') && !decisionId;
+    el.className = 'node' + (st.status !== 'idle' ? ' ' + st.status : '') + (locked ? ' locked' : '');
+    el.querySelector('.st').textContent =
+      st.status === 'running' ? '执行中…'
+      : st.status === 'done' ? (st.summary || '完成')
+      : st.status === 'fail' ? (st.error || '失败')
+      : locked ? '需要决策编号' : '';
+  }
+}
+
+function setStep(id, patch) {
+  state[id] = { ...(state[id] || {}), ...patch };
+  refreshNodes();
+}
+
+/* ===========================================================================
+   五、执行
+   =========================================================================== */
+
+async function runStep(id) {
+  const s = STEPS[id];
+  if (!s) return;
+  if ((s.needs || []).includes('decision_id') && !decisionId) {
+    flash('先跑一次「决策合成」拿到决策编号，再取依据。');
+    return;
+  }
+  const subject = $('#subject').value.trim();
+  if ((s.needs || []).includes('subject') && !subject) {
+    flash('先填企业名称。');
+    return;
+  }
+
+  setStep(id, { status: 'running', error: null });
+  if (id === 'evidence' && decisionId) animateEdge('decide', 'evidence', 1);
+  else EDGES.filter(([a]) => a === id).forEach(([a, b]) => animateEdge(a, b, 1));
+
+  try {
+    const r = await fetch('/api/step', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step: id, subject, decision_id: decisionId || '' }),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      const msg = typeof d.detail === 'object' ? (d.detail.error || d.detail.hint) : d.detail;
+      throw new Error(msg || ('HTTP ' + r.status));
+    }
+    if (!d.ok) throw new Error(d.error || '执行失败');
+
+    if (id === 'decide' && d.data?.provenance?.decision_id) {
+      decisionId = d.data.provenance.decision_id;
+    }
+    setStep(id, { status: 'done', data: d.data, elapsed: d.elapsed_ms, summary: summarize(id, d.data) });
+    ripple(id);
+    renderPanel(id);
+  } catch (e) {
+    setStep(id, { status: 'fail', error: String(e.message || e).slice(0, 90) });
+    renderPanelError(id, e.message || String(e));
+  }
+}
+
+async function runAll() {
+  const subject = $('#subject').value.trim();
+  if (!subject) { flash('先填企业名称。'); return; }
+  const btn = $('#btnRun');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>分析中';
+  $('#results').innerHTML = '';
+  EDGES.forEach(([a, b]) => { const k = edgeKey(a, b); if (viz.edges[k]) viz.edges[k].progress = 0; });
+
+  try {
+    for (const id of Object.keys(STEP_POS)) {
+      if (id === 'evidence' && !decisionId) continue;
+      await runStep(id);
+      await sleep(140);
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '开始分析';
+  }
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function summarize(id, d) {
+  if (!d) return '完成';
+  switch (id) {
+    case 'lookup':   return d.found ? `命中 ${d.record_count} 条登记记录` : '查无此主体';
+    case 'social':   return d.abnormal_count ? `${d.abnormal_count} 个月异常` : `${d.record_count} 条记录，无异常`;
+    case 'judicial': return `${d.penalty_count || 0} 条处罚，${d.lawsuit_count || 0} 条涉诉`;
+    case 'finance':  return `${Object.keys(d.metrics || {}).length} 项指标`;
+    case 'graph':    return `命中 ${(d.paths || []).length} 条路径`;
+    case 'decide':   return `${d.verdict || ''} · ${d.confidence ?? ''}`;
+    case 'evidence': return `${(d.accepted_chains || []).length} 条依据链`;
+    default:         return '完成';
+  }
+}
+
+/* ===========================================================================
+   六、结果面板
+   =========================================================================== */
+
+function renderPanel(id) {
+  const s = STEPS[id], st = state[id];
+  const old = document.getElementById('panel-' + id);
+  if (old) old.remove();
+
+  const el = document.createElement('div');
+  el.className = 'rpanel'; el.id = 'panel-' + id;
+
+  let body = '';
+  try { body = renderBody(id, st.data) || '<div class="empty">没有可展示的内容</div>'; }
+  catch (e) { body = `<div class="err">渲染出错：${esc(e.message)}</div>`; }
+
+  el.innerHTML = `
+    <div class="rhead" onclick="this.parentNode.classList.toggle('folded')">
+      <span class="ic">${s.icon}</span>
+      <span class="tt">${s.label}</span>
+      <span class="ms">${st.elapsed} ms · ${esc(s.tool)}</span>
+      <span class="caret">▼</span>
+    </div>
+    <div class="rbody">${body}</div>`;
+
+  $('#results').prepend(el);
+  runQueuedAnimations(el);
+}
+
+function renderPanelError(id, message) {
+  const s = STEPS[id];
+  const old = document.getElementById('panel-' + id);
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.className = 'rpanel'; el.id = 'panel-' + id;
+  el.innerHTML = `
+    <div class="rhead" onclick="this.parentNode.classList.toggle('folded')">
+      <span class="ic">${s.icon}</span><span class="tt">${s.label}</span>
+      <span class="ms">失败</span><span class="caret">▼</span>
+    </div>
+    <div class="rbody"><div class="err">${esc(message)}</div></div>`;
+  $('#results').prepend(el);
+}
+
+/* 渲染函数在**字符串阶段**没法挂动画——那时元素还不存在。所以由 body 渲染函数
+   登记一个"等插入 DOM 后要跑的动作"，renderPanel 插进去之后统一执行。
+   闭包拿到的是插入后的那个面板元素，作用域天然收在本面板内。 */
+const pendingAnims = [];
+
+function queueAnimation(fn) { pendingAnims.push(fn); }
+
+function runQueuedAnimations(root) {
+  const queued = pendingAnims.splice(0);
+  queued.forEach(fn => { try { fn(root); } catch (e) { /* 动画失败不该影响数据展示 */ } });
+}
+
+function renderBody(id, d) {
+  if (!d) return '';
+  switch (id) {
+    case 'lookup':   return kv(d, [['是否登记在册', d.found ? '是' : '否'], ['命中记录', d.record_count]])
+                            + records(d.records);
+    case 'social':   return socialBody(d);
+    case 'judicial': return judicialBody(d);
+    case 'finance':  return financeBody(d);
+    case 'graph':    return graphBody(d);
+    case 'decide':   return decideBody(d);
+    case 'evidence': return evidenceBody(d);
+    default:         return `<pre class="log">${esc(JSON.stringify(d, null, 2))}</pre>`;
+  }
+}
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function kv(d, pairs) {
+  return '<dl class="kv">' + pairs
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>';
+}
+
+function records(list) {
+  if (!list || !list.length) return '';
+  return list.slice(0, 8).map(r => {
+    const a = r.attributes || {};
+    const head = Object.entries(a).slice(0, 4)
+      .map(([k, v]) => `<span class="pill">${esc(k)}: ${esc(String(v).slice(0, 30))}</span>`).join(' ');
+    return `<div class="rec">
+      <div class="rl"><b>${esc(r.label || r.node || '')}</b>${head}</div>
+      ${r.source_document ? `<div class="hint" style="margin-top:6px">来源：${esc(r.source_document)} · ${esc(r.source_locator || '')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function socialBody(d) {
+  let h = kv(d, [['缴费记录', d.record_count], ['异常月份', d.abnormal_count]]);
+  if (d.abnormal_count) {
+    h += '<h3>异常月份</h3>';
+    h += (d.abnormal_records || []).map(r => {
+      const a = r.attributes || {};
+      return `<div class="rec"><div class="rl">
+        <span class="pill bad">${esc(a['缴纳月份'] || r.label || '')}</span>
+        <span class="pill bad">${esc(a['缴纳状态'] || '异常')}</span>
+        <span class="pill">实缴 ${esc(a['实缴人数'] ?? '—')} 人</span>
+      </div></div>`;
+    }).join('');
+  }
+  return h + records((d.records || []).slice(0, 4));
+}
+
+function judicialBody(d) {
+  let h = kv(d, [['行政处罚', d.penalty_count], ['涉诉案件', d.lawsuit_count]]);
+  const all = [...(d.penalties || []), ...(d.lawsuits || [])];
+  return h + (all.length ? records(all) : '<div class="empty">没有行政处罚与涉诉记录</div>');
+}
+
+function financeBody(d) {
+  const m = d.metrics || {};
+  if (!Object.keys(m).length) return '<div class="empty">没有解析到财务指标</div>';
+  let h = '<dl class="kv">' + Object.entries(m)
+    .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>';
+  if (d.evidence?.length) {
+    h += '<h3>取数来源</h3>' + d.evidence.slice(0, 5).map(e =>
+      `<div class="rec"><div class="rl"><span class="pill">${esc(e.source_document || '')}</span>
+       <span class="hint">${esc((e.snippet || '').slice(0, 70))}</span></div></div>`).join('');
+  }
+  return h;
+}
+
+function graphBody(d) {
+  const paths = d.paths || [];
+  if (!paths.length) return '<div class="empty">没有命中推理路径</div>';
+  return paths.slice(0, 6).map(p => `<div class="chain">
+    <div class="ch">${esc(p.chain || '')}</div>
+    <div class="meta">置信度 ${esc(p.confidence ?? '—')} · ${esc(p.hops ?? '—')} 跳 · ${esc(p.constraint || '')}</div>
+    ${(p.evidence || []).slice(0, 4).map(e =>
+      `<div class="hop">${esc((e.snippet || '').slice(0, 80))}
+       <span class="src">　${esc(e.source_document || '')}</span></div>`).join('')}
+  </div>`).join('');
+}
+
+function decideBody(d) {
+  const v = d.verdict || '';
+  const cls = v.includes('审慎') ? 'mid' : (v.includes('不予') || v.includes('证据不足') ? '' : 'good');
+  const conf = Number(d.confidence ?? 0);
+  const pct = Math.round(conf * 100);
+
+  let h = `<div class="verdict ${cls}" data-conf="${conf}">
+    <div class="gauge">
+      <svg width="86" height="86">
+        <circle cx="43" cy="43" r="36" fill="none" stroke="#1e2842" stroke-width="7"/>
+        <circle cx="43" cy="43" r="36" fill="none" stroke="${cls === 'mid' ? '#fbbf24' : (cls ? '#2dd4a7' : '#ff4d6d')}"
+                stroke-width="7" stroke-linecap="round" data-ring
+                stroke-dasharray="${2 * Math.PI * 36}" stroke-dashoffset="${2 * Math.PI * 36}"/>
+      </svg>
+      <div class="val">0.0000</div>
+    </div>
+    <div>
+      <div class="big">${esc(v || '—')}</div>
+      <div class="sub">决策编号 ${esc(d.provenance?.decision_id || '—')}</div>
+      <div class="sub">采纳路径 ${esc(d.accepted_path_count ?? 0)} 条 · 被拒 ${esc(d.rejected_path_count ?? 0)} 条</div>
+    </div>
+  </div>`;
+
+  if (d.rationale) h += `<div class="rec"><div class="rl">${esc(d.rationale)}</div></div>`;
+
+  const hits = (d.judgements || []).filter(j => j.triggered).length;
+  (d.judgements || []).forEach(j => {
+    const obs = Number(j.observed_value ?? 0), thr = Number(j.threshold_value ?? 0);
+    const hit = !!j.triggered;
+    const max = Math.max(obs, thr) * 1.35 || 1;
+    h += `<div class="thr ${hit ? 'hit' : ''}">
+      <div class="lbl"><span>${esc(j.threshold_name)}（${esc(j.clause_label || '')}）</span>
+        <span>观测 ${esc(obs)} / 阈值 ${esc(thr)}　<b>${hit ? '已触发' : '未触发'}</b></span></div>
+      <div class="bar"><div class="fill" data-w="${Math.min(100, obs / max * 100)}"></div>
+        <div class="mark" style="left:${Math.min(99, thr / max * 100)}%"></div></div>
+      <div class="hint" style="margin-top:6px">${esc(j.observed_basis || '')}</div>
+    </div>`;
+  });
+
+  // 动画必须**限定在本面板内**。早先用 document.querySelectorAll('.gauge .val')
+  // 是全局的——渲染第二张卡时会连带重播第一张卡的动画，多跑几次之后所有
+  // 面板的数字一起乱跳。所以这里把范围收在 panel 上，DOM 插入后再跑。
+  queueAnimation((root) => {
+    const box = root.querySelector('.verdict');
+    const conf = Number(box?.dataset.conf || 0);
+    root.querySelectorAll('.gauge .val').forEach(el => rollNumber(el, conf, 900));
+    root.querySelectorAll('.gauge circle[data-ring]').forEach(c => {
+      const len = 2 * Math.PI * 36;
+      c.style.transition = 'stroke-dashoffset 1s cubic-bezier(.2,.8,.3,1)';
+      c.style.strokeDashoffset = String(len * (1 - conf));
+    });
+    root.querySelectorAll('.thr .fill').forEach(f => {
+      f.style.width = (f.dataset.w || 0) + '%';
+    });
+    if (hits > 0) shake();
+  });
+
+  return h;
+}
+
+function evidenceBody(d) {
+  const chains = d.accepted_chains || [];
+  let h = kv(d, [['采纳链', chains.length], ['被拒链', (d.rejected_chains || []).length],
+                 ['依据条款', (d.clauses || []).length],
+                 ['依据漂移', (d.drift_count ? d.drift_count + ' 项' : '无')]]);
+  h += chains.slice(0, 7).map((c, i) => `<div class="chain" style="animation:slideIn .4s ${i * 60}ms both">
+    <div class="ch">${esc(c.chain || '')}</div>
+    <div class="meta">${esc(c.constraint || '')} · 置信度 ${esc(c.confidence ?? '—')} · ${esc(c.hops ?? '—')} 跳</div>
+    ${(c.evidence || []).slice(0, 4).map(e =>
+      `<div class="hop">${esc((e.snippet || '').slice(0, 90))}
+       <span class="src">　${esc(e.evidence_class === 'direct' ? '直接' : '派生')} · ${esc(e.source_document || '')} · ${esc(e.source_locator || '')}</span></div>`).join('')}
+  </div>`).join('');
+  if (d.clauses?.length) {
+    h += '<h3>依据条款原文</h3>';
+    h += d.clauses.slice(0, 3).map(c =>
+      `<div class="rec"><div class="rl"><b>${esc(c.label || '')}</b></div>
+       <div class="hint" style="margin-top:7px;color:var(--ink-2)">${esc((c.text || '').slice(0, 320))}</div></div>`).join('');
+  }
+  return h;
+}
+
+function rollNumber(el, target, ms) {
+  const t0 = performance.now();
+  (function step(now) {
+    const p = Math.min(1, (now - t0) / ms);
+    const k = 1 - Math.pow(1 - p, 3);
+    el.textContent = (target * k).toFixed(4);
+    if (p < 1) requestAnimationFrame(step);
+    else el.textContent = target.toFixed(4);
+  })(t0);
+}
+
+function shake() {
+  const s = $('#stage');
+  s.animate([
+    { transform: 'translateX(0)' }, { transform: 'translateX(-3px)' },
+    { transform: 'translateX(3px)' }, { transform: 'translateX(-2px)' },
+    { transform: 'translateX(0)' },
+  ], { duration: 260, easing: 'ease-out' });
+}
+
+function flash(msg) {
+  const el = document.createElement('div');
+  el.className = 'err';
+  el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+/* ===========================================================================
+   七、服务状态
+   =========================================================================== */
+
+async function loadStatus(manual) {
+  const box = $('#statusBody');
+  if (isFile) { box.innerHTML = '<div class="err">这个页面需要从应用窗口打开。</div>'; return; }
+  box.innerHTML = '<div class="empty">正在检查…</div>';
+  try {
+    const d = await (await fetch('/api/status')).json();
+    let h = d.services.map(s => `<div class="srow">
+      <span class="led ${s.ok ? 'ok' : 'bad'}"></span>
+      <span class="nm">${esc(s.name)}</span>
+      <span class="vl">${esc(s.detail)}</span></div>`).join('');
+
+    const g = d.decision?.graph;
+    h += `<div class="srow"><span class="led ${g ? 'ok' : 'bad'}"></span>
+      <span class="nm">决策图谱</span>
+      <span class="vl">${g ? `${g.nodes} 节点 / ${g.edges} 边　本体 v${esc(d.decision.ontology_version || '')}` : '读不到'}</span></div>`;
+
+    const nx = d.nexent || {};
+    h += `<div class="srow"><span class="led ${nx.registered ? 'ok' : 'warn'}"></span>
+      <span class="nm">Nexent</span>
+      <span class="vl">${nx.registered ? `已接入，${nx.tools} 个工具` : '未接入（见部署页）'}</span></div>`;
+    if (nx.models?.length) h += `<div class="srow"><span class="led ok"></span>
+      <span class="nm">模型</span><span class="vl">${esc(nx.models.map(m => m.name).join('、'))}</span></div>`;
+    if (nx.knowledges?.length) h += `<div class="srow"><span class="led ok"></span>
+      <span class="nm">知识库</span><span class="vl">${esc(nx.knowledges.map(k => k.name).join('、'))}</span></div>`;
+
+    box.innerHTML = h;
+    const bad = d.services.some(s => !s.ok) || !g;
+    $('#tabDot').classList.toggle('hide', !bad);
+  } catch (e) {
+    box.innerHTML = `<div class="err">检查失败：${esc(e.message)}</div>`;
+    $('#tabDot').classList.remove('hide');
+  }
+}
+
+/* 拖拽导入 */
+(function initDrop() {
+  const drop = $('#drop'), input = $('#fileInput');
+  if (!drop) return;
+  drop.onclick = () => input.click();
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); drop.classList.add('over');
+  }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); drop.classList.remove('over');
+  }));
+  drop.addEventListener('drop', e => { if (e.dataTransfer.files.length) upload(e.dataTransfer.files); });
+  input.onchange = () => { if (input.files.length) upload(input.files); };
+})();
+
+async function upload(files) {
+  const box = $('#uploadRes');
+  box.innerHTML = '<div class="empty">正在导入…</div>';
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  try {
+    const d = await (await fetch('/api/upload', { method: 'POST', body: fd })).json();
+    if (!d.results) { box.innerHTML = `<div class="err">${esc(d.detail || '上传失败')}</div>`; return; }
+    box.innerHTML = d.results.map(x => `<div class="srow">
+      <span class="led ${x.ok ? 'ok' : 'bad'}"></span>
+      <span class="nm">${esc(x.name)}</span>
+      <span class="vl">${esc(x.ok ? (x.detail || '成功') : (x.error || '失败'))}
+        ${x.target ? '· ' + esc(x.target) : ''}</span></div>`).join('');
+  } catch (e) { box.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+/* ===========================================================================
+   八、部署与配置
+   =========================================================================== */
+
+async function loadProject() {
+  const box = $('#projBody');
+  try {
+    const d = await (await fetch('/api/project')).json();
+    if (d.path) {
+      box.innerHTML = `<div class="srow"><span class="led ok"></span>
+        <span class="nm">已找到</span><span class="vl">${esc(d.path)}</span></div>`;
+      $('#projPath').value = d.path;
+    } else {
+      box.innerHTML = `<div class="err">没找到项目目录。请把 exe 放到项目根目录，
+        或在下面填入包含 <code>pyproject.toml</code> 的目录。</div>`;
+    }
+  } catch (e) { box.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+async function saveProject() {
+  const path = $('#projPath').value.trim();
+  if (!path) return;
+  const r = await fetch('/api/project', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  });
+  const d = await r.json();
+  if (r.ok) { flash('已保存项目目录'); loadProject(); loadKeyConfig(); }
+  else flash(d.detail?.error || '保存失败');
+}
+
+async function loadKeyConfig() {
+  try {
+    const d = await (await fetch('/api/config/llm')).json();
+    if (!d.ok) return;
+    $('#baseInput').value = d.base_url || '';
+    $('#modelInput').value = d.model || '';
+    if (d.has_key) $('#keyInput').placeholder = `已保存：${d.key_masked}（留空表示不修改）`;
+  } catch (e) { /* 忽略 */ }
+}
+
+async function saveKey() {
+  const body = {
+    api_key: $('#keyInput').value.trim(),
+    base_url: $('#baseInput').value.trim(),
+    model: $('#modelInput').value.trim(),
+    provider: 'deepseek',
+  };
+  const r = await fetch('/api/config/llm', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const d = await r.json();
+  if (r.ok) { $('#keyInput').value = ''; flash('已写入 .env'); loadKeyConfig(); }
+  else flash(d.detail?.error || '保存失败');
+}
+
+async function testKey() {
+  const box = $('#keyRes');
+  box.innerHTML = '<div class="empty">正在测试…</div>';
+  try {
+    const r = await fetch('/api/config/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: $('#keyInput').value.trim(),
+        base_url: $('#baseInput').value.trim(),
+        model: $('#modelInput').value.trim(),
+      }),
+    });
+    const d = await r.json();
+    box.innerHTML = d.ok
+      ? `<div class="ok-box">✓ 连通正常　模型 ${esc(d.model)}　延迟 ${d.latency_ms} ms
+         ${d.reply ? '　返回：' + esc(d.reply) : ''}</div>`
+      : `<div class="err">✗ ${esc(d.error || '失败')}
+         ${d.detail ? '<div class="hint" style="margin-top:7px">' + esc(d.detail.slice(0, 220)) + '</div>' : ''}</div>`;
+  } catch (e) { box.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+async function registerModels() {
+  const box = $('#keyRes');
+  box.innerHTML = '<div class="empty">正在注册…</div>';
+  try {
+    const d = await (await fetch('/api/config/register', { method: 'POST' })).json();
+    const rows = Object.entries(d.results || {}).map(([k, v]) => {
+      const label = { deepseek: 'DeepSeek 对话模型', embedding: '本地向量模型', vector_service: '向量化服务' }[k] || k;
+      return `<div class="srow"><span class="led ${v.ok ? 'ok' : 'bad'}"></span>
+        <span class="nm">${esc(label)}</span><span class="vl">${esc(v.detail)}</span></div>`;
+    }).join('');
+    box.innerHTML = `<div class="${d.ok ? 'ok-box' : 'err'}">${d.ok ? '✓ 已就绪' : '✗ 有项目未完成'}</div>${rows}`;
+  } catch (e) { box.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+async function refreshDeploy() {
+  const box = $('#deployStats');
+  try {
+    const d = await (await fetch('/api/deploy/status')).json();
+    let h = `<div class="stat"><div class="t">Docker</div>
+      <div class="v" style="color:${d.docker.ok ? 'var(--ok)' : 'var(--bad)'}">
+        ${d.docker.ok ? '运行中' : '未运行'}</div>
+      <div class="d">${esc(d.docker.detail)}</div></div>`;
+    for (const c of d.containers || []) {
+      const good = c.state === 'running';
+      h += `<div class="stat"><div class="t">${esc(c.label)}</div>
+        <div class="v" style="color:${good ? 'var(--ok)' : 'var(--ink-3)'}">
+          ${good ? '运行中' : (c.state === 'missing' ? '未创建' : esc(c.state))}</div>
+        <div class="d">${esc(c.image)}${c.image_ready ? ' · 镜像已就绪' : ' · 镜像未构建'}</div></div>`;
+    }
+    box.innerHTML = h;
+  } catch (e) {
+    box.innerHTML = `<div class="stat"><div class="t">状态</div>
+      <div class="v" style="color:var(--bad)">读取失败</div><div class="d">${esc(e.message)}</div></div>`;
+  }
+}
+
+async function launchDocker() {
+  const r = await fetch('/api/deploy/launch', { method: 'POST' });
+  const d = await r.json();
+  flash(d.message);
+  if (d.ok) {
+    // Docker Desktop 要几十秒才起来，这里自己轮询，别让用户手动刷新
+    let n = 0;
+    const timer = setInterval(async () => {
+      n++;
+      await refreshDeploy();
+      if ($('#deployStats').querySelector('.v')?.textContent.includes('运行中') || n > 12) clearInterval(timer);
+    }, 5000);
+  }
+}
+
+let pollTimer = null;
+
+async function startDeploy(rebuild) {
+  const log = $('#deployLog');
+  log.classList.remove('hidden');
+  log.textContent = '';
+  try {
+    const r = await fetch('/api/deploy/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rebuild: rebuild, skip_nexent: false }),
+    });
+    const job = await r.json();
+    if (!r.ok) { log.textContent = job.detail?.error || '启动失败'; return; }
+    pollDeploy(job.job_id);
+  } catch (e) { log.textContent = '启动失败：' + e.message; }
+}
+
+function pollDeploy(jobId) {
+  let offset = 0;
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const d = await (await fetch(`/api/deploy/log?job_id=${jobId}&offset=${offset}`)).json();
+      if (d.lines?.length) {
+        const log = $('#deployLog');
+        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+        for (const line of d.lines) {
+          const span = document.createElement('div');
+          span.textContent = line || ' ';
+          if (/✓|已启动|就绪|完成/.test(line)) span.className = 'l-ok';
+          else if (/✗|失败|错误/.test(line)) span.className = 'l-bad';
+          else if (/^[^ ].*…?$/.test(line) && !line.startsWith(' ')) span.className = 'l-hd';
+          log.appendChild(span);
+        }
+        if (atBottom) log.scrollTop = log.scrollHeight;
+        offset = d.next_offset;
+      }
+      if (d.done) { clearInterval(pollTimer); await refreshDeploy(); await loadStatus(); }
+    } catch (e) { clearInterval(pollTimer); }
+  }, 700);
+}
+
+/* ===========================================================================
+   九、启动
+   =========================================================================== */
+
+initViz();
+loadSteps().then(() => { if (!isFile) loadStatus(); });
+setTimeout(loadStatus, 900);
+</script>
+</body>
+</html>

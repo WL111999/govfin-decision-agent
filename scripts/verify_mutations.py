@@ -148,6 +148,54 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "## 第一轮：核验真实性\n\n",
         "tests/test_nexent_bundle.py::test_few_shots_show_real_code_blocks",
     ),
+    (
+        "步骤表引用了不存在的工具名",
+        "app/server.py",
+        '"tool": "gov_judicial_scan",\n        "label": "司法与处罚",',
+        '"tool": "gov_judicial_scann",\n        "label": "司法与处罚",',
+        "tests/test_desktop_app.py::test_every_step_tool_is_actually_registered",
+    ),
+    (
+        "步骤表给工具传了它不接受的参数",
+        "app/server.py",
+        'lambda subject, decision_id: {"subject": subject, "persist": True},',
+        'lambda subject, decision_id: {"subject": subject, "persist": True, "bogus": 1},',
+        "tests/test_desktop_app.py::test_step_argument_names_match_the_tool_signatures",
+    ),
+    (
+        "写 .env 时整体覆盖（丢掉注释与别的键）",
+        "app/paths.py",
+        "    with path.open(\"w\", encoding=\"utf-8\", newline=\"\\n\") as fh:\n"
+        "        fh.write(\"\\n\".join(out) + \"\\n\")\n",
+        "    with path.open(\"w\", encoding=\"utf-8\", newline=\"\\n\") as fh:\n"
+        "        fh.write(\"\\n\".join(f\"{k}={v}\" for k, v in updates.items()) + \"\\n\")\n",
+        "tests/test_desktop_app.py::test_env_write_preserves_untouched_lines",
+    ),
+    (
+        "写 .env 时把换行符改成 CRLF",
+        "app/paths.py",
+        "    with path.open(\"w\", encoding=\"utf-8\", newline=\"\\n\") as fh:\n"
+        "        fh.write(\"\\n\".join(out) + \"\\n\")\n",
+        "    with path.open(\"w\", encoding=\"utf-8\") as fh:\n"
+        "        fh.write(\"\\r\\n\".join(out) + \"\\r\\n\")\n",
+        "tests/test_desktop_app.py::test_env_write_preserves_line_endings",
+    ),
+    (
+        "项目目录只看 pyproject.toml（误认别人的包目录）",
+        "app/paths.py",
+        'PROJECT_MARKERS = ("pyproject.toml", "deploy/Dockerfile")',
+        'PROJECT_MARKERS = ("pyproject.toml",)',
+        "tests/test_desktop_app.py::test_looks_like_project_requires_both_markers",
+    ),
+    (
+        "首页路由没被替换（打开来还是旧控制台）",
+        "app/server.py",
+        "            route.endpoint = desktop_index\n"
+        "            route.dependant.call = desktop_index\n"
+        "            return\n",
+        "            return\n",
+        "tests/test_desktop_app.py::test_root_route_serves_the_desktop_page",
+    ),
 ]
 
 
