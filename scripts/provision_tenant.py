@@ -45,6 +45,12 @@ MCP_DESCRIPTION = "金融+政务跨域授信决策：政务事实核验、财务
 DEFAULT_TENANT = "GovFin 演示租户"
 # 不能用 .local：那是保留域名，校验层会直接拒掉（"special-use or reserved name"）。
 DEFAULT_EMAIL = "govfin@nexent-demo.com"
+# 默认密码**固定**，不用随机生成。随机密码看着更安全，但会让脚本失去幂等性：
+# 第二次跑时邮箱已注册、跳过注册，却拿着一个新随机密码去登录，必然失败——
+# 而失败信息是"登录失败"，看起来像账号出了问题，实际是密码每次都不一样。
+# 演示环境要的是"随时能跑第二次"，安全边界由"这台机器谁能访问"决定，
+# 不由这个密码的随机性决定。
+DEFAULT_PASSWORD = "***REDACTED***"
 SKILLS_DIR = ROOT / "nexent" / "skills" / "dist"
 
 
@@ -244,11 +250,81 @@ def install_skills(auth: dict, token: str) -> bool:
     return ok_all
 
 
+def configure_model(auth: dict) -> int | None:
+    """给租户配一个大模型。返回 model_id，失败返回 None。
+
+    **没有模型的租户是用不了的状态**：智能体建得出来、工具挂得上，但一问话就报错，
+    而报错信息指向的是"模型不可用"而不是"你没配模型"——用户很难从那里反推出
+    要先去模型配置页填一个 key。
+
+    key 从 govfin 自己的 .env 读（GOVFIN_LLM_API_KEY），不写死在本文件里，
+    也不打印。已经配过同名的就跳过。
+    """
+    status, body = _http("GET", f"{CONFIG_API}/model/list", headers=auth)
+    existing = (_json(body) or {}).get("data") if status == 200 else None
+    if isinstance(existing, list) and existing:
+        names = [m.get("model_name") for m in existing]
+        print(f"  ↺ 已有 {len(existing)} 个模型：{', '.join(str(n) for n in names[:5])}")
+        for m in existing:
+            if "deepseek" in str(m.get("model_name", "")).lower():
+                return m.get("id") or m.get("model_id")
+        return existing[0].get("id") or existing[0].get("model_id")
+
+    govfin_env = ROOT / ".env"
+    api_key = ""
+    if govfin_env.exists():
+        for line in govfin_env.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("GOVFIN_LLM_API_KEY="):
+                api_key = line.partition("=")[2].strip().strip('"').strip("'")
+                break
+    if not api_key:
+        print("  ! govfin 的 .env 里没有 GOVFIN_LLM_API_KEY，跳过模型配置")
+        print("    没有模型的租户用不了——请到「智能体开发 → 模型配置」手工添加")
+        return None
+
+    status, body = _http(
+        "POST",
+        f"{CONFIG_API}/model/create",
+        headers=auth,
+        payload={
+            "model_name": "deepseek-chat",
+            "display_name": "DeepSeek Chat",
+            "model_type": "llm",
+            "model_factory": "DeepSeek",
+            "base_url": "https://api.deepseek.com/v1",
+            "api_key": api_key,
+            "max_tokens": 8192,
+            "context_window_tokens": 65536,
+            "timeout_seconds": 120,
+        },
+    )
+    if status not in (200, 201):
+        print(f"  ✗ 配置模型失败 HTTP {status}: {body[:300]}")
+        return None
+    data = (_json(body) or {}).get("data") or {}
+    model_id = data.get("model_id") or data.get("id")
+    print(f"  + 已配置 DeepSeek Chat  model_id={model_id}")
+
+    # healthcheck 吃的是 query 参数（display_name + model_type），不是 JSON body。
+    # 传 body 会拿到 422，而 422 的报错里只写"字段缺失"，看不出是传错了位置。
+    from urllib.parse import urlencode
+
+    query = urlencode({"display_name": "DeepSeek Chat", "model_type": "llm"})
+    status, body = _http("POST", f"{CONFIG_API}/model/healthcheck?{query}", headers=auth)
+    if status == 200:
+        conn = (_json(body) or {}).get("data") or {}
+        print(f"  ✓ 连通性检测：{conn.get('connect_status') or conn.get('status') or 'ok'}")
+    else:
+        print(f"  ! 连通性检测 HTTP {status}（不阻断，可能是网络问题）")
+    return model_id
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="在 Nexent 里开演示租户并装入 govfin")
     parser.add_argument("--tenant-name", default=DEFAULT_TENANT)
     parser.add_argument("--email", default=DEFAULT_EMAIL)
-    parser.add_argument("--password", default=None, help="留空则随机生成")
+    parser.add_argument("--password", default=DEFAULT_PASSWORD,
+                        help=f"租户账号密码，默认 {DEFAULT_PASSWORD}")
     args = parser.parse_args()
 
     print(f"[1] Nexent 配置：{ENV_FILE}")
@@ -283,7 +359,7 @@ def main() -> int:
     print(f"  ✓ 邀请码：{invite}")
 
     print(f"\n[4] 注册租户用户「{args.email}」")
-    password = args.password or _strong_password()
+    password = args.password
     if not signup(args.email, password, invite):
         return 1
 
@@ -304,6 +380,9 @@ def main() -> int:
 
     print("\n[7] 在本租户下导入 Skill 模板")
     install_skills(auth, token)
+
+    print("\n[8] 配置大模型")
+    model_id = configure_model(auth)
 
     print("\n" + "=" * 62)
     print("  登录信息")

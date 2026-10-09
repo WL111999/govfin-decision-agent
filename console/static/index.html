@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GovFin 控制台</title>
+<style>
+/* 极简：一种强调色、一种灰阶、大量留白。
+   颜色多了会让人以为颜色本身在传递信息，而这里唯一的信号是"通没通"。 */
+:root{
+  --ink:#16181d; --ink-2:#5b6070; --ink-3:#8b90a0;
+  --line:#e6e8ee; --bg:#fbfbfd; --card:#fff;
+  --accent:#2b5cff; --accent-soft:#eef2ff;
+  --ok:#0d8a5f; --warn:#b3760a; --bad:#c0392b;
+  --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--ink); background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:940px;margin:0 auto;padding:0 24px 96px}
+
+/* 顶栏 */
+header{border-bottom:1px solid var(--line);background:var(--card);margin-bottom:44px}
+.hd{max-width:940px;margin:0 auto;padding:20px 24px;display:flex;align-items:center;gap:14px}
+.logo{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px}
+.hd h1{font-size:16px;font-weight:600;letter-spacing:.01em}
+.hd .sub{color:var(--ink-3);font-size:13px;margin-left:auto}
+
+/* 步骤导航 */
+.steps{display:flex;gap:6px;margin-bottom:36px;flex-wrap:wrap}
+.step{
+  display:flex;align-items:center;gap:9px;padding:9px 15px;border-radius:var(--r);
+  border:1px solid var(--line);background:var(--card);cursor:pointer;
+  font-size:14px;color:var(--ink-2);transition:.15s;user-select:none;
+}
+.step:hover{border-color:#cfd4e0}
+.step.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:500}
+.step .n{
+  width:19px;height:19px;border-radius:50%;background:#eceef4;color:var(--ink-2);
+  display:grid;place-items:center;font-size:11px;font-weight:600;flex:none;
+}
+.step.on .n{background:var(--accent);color:#fff}
+
+/* 卡片 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px 32px;margin-bottom:18px}
+.card h2{font-size:19px;font-weight:600;margin-bottom:8px}
+.card .lead{color:var(--ink-2);font-size:14px;margin-bottom:24px}
+.card h3{font-size:14px;font-weight:600;margin:26px 0 12px;color:var(--ink)}
+
+/* 状态行 */
+.row{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ink-3)}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
+.row .lbl{font-weight:500;min-width:110px}
+.row .val{color:var(--ink-2);font-size:14px;margin-left:auto;text-align:right}
+
+/* 表单 */
+label{display:block;font-size:13px;font-weight:500;color:var(--ink-2);margin-bottom:7px}
+input,select{
+  width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r);
+  font:inherit;background:var(--card);color:var(--ink);transition:.15s;
+}
+input:focus,select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.hint{font-size:12.5px;color:var(--ink-3);margin-top:7px}
+
+button{
+  padding:11px 22px;border:0;border-radius:var(--r);background:var(--accent);color:#fff;
+  font:inherit;font-weight:500;cursor:pointer;transition:.15s;
+}
+button:hover{background:#1e4ae0}
+button:disabled{background:#c8ccd8;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
+button.ghost:hover{background:#f4f5f9;border-color:#cfd4e0}
+.btn-row{display:flex;gap:10px;align-items:center;margin-top:22px;flex-wrap:wrap}
+
+/* 结果 */
+.verdict{
+  display:flex;align-items:baseline;gap:14px;padding:22px 26px;border-radius:12px;
+  background:#f7f8fc;border:1px solid var(--line);margin:22px 0;
+}
+.verdict .big{font-size:26px;font-weight:600;letter-spacing:.01em}
+.verdict .conf{color:var(--ink-2);font-size:14px}
+.verdict.warn{background:#fffaf0;border-color:#f0e0be}
+.verdict.bad{background:#fdf4f3;border-color:#f0d5d1}
+.verdict.ok{background:#f2faf7;border-color:#cbe8dd}
+
+.chain{margin-top:10px}
+.chain .item{display:flex;gap:13px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px}
+.chain .item:last-child{border-bottom:0}
+.chain .tag{
+  font-size:12px;padding:2px 9px;border-radius:20px;background:#eef0f6;color:var(--ink-2);
+  flex:none;height:fit-content;font-weight:500;
+}
+.chain .tag.ok{background:#e6f5ef;color:var(--ok)}
+
+.quote{
+  background:#f7f8fc;border-left:2px solid var(--accent);padding:15px 19px;border-radius:0 8px 8px 0;
+  font-size:13.5px;color:var(--ink-2);margin:12px 0;white-space:pre-wrap;
+}
+.empty{color:var(--ink-3);font-size:14px;padding:26px 0;text-align:center}
+.err{color:var(--bad);font-size:14px;background:#fdf4f3;border:1px solid #f0d5d1;padding:13px 16px;border-radius:9px;margin-top:18px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px;margin-right:7px}
+@keyframes s{to{transform:rotate(360deg)}}
+code{background:#f2f4f9;padding:2px 7px;border-radius:5px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace}
+.hidden{display:none}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:14px;margin:14px 0}
+.kv dt{color:var(--ink-3);font-size:13px}
+.kv dd{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd">
+    <div class="logo">G</div>
+    <h1>GovFin 控制台</h1>
+    <span class="sub">金融+政务跨域授信决策</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="steps" id="steps"></div>
+
+  <!-- 1 检查 -->
+  <section class="card" data-step="0">
+    <h2>先确认服务在跑</h2>
+    <p class="lead">这套系统由四块组成。任何一块没起来，后面的步骤都会失败，所以先在这里看一眼。</p>
+    <div id="status"><div class="empty">正在检查…</div></div>
+    <div class="btn-row">
+      <button onclick="loadStatus(this)">重新检查</button>
+    </div>
+  </section>
+
+  <!-- 2 决策 -->
+  <section class="card hidden" data-step="1">
+    <h2>跑一次授信决策</h2>
+    <p class="lead">输入企业名称或统一社会信用代码。系统会核验政务登记、采集社保与司法事实、
+      做跨域多跳推理，最后给出可追溯的结论。</p>
+    <label for="subject">企业名称 / 统一社会信用代码</label>
+    <input id="subject" value="乙贸易有限公司" placeholder="例如：乙贸易有限公司" autocomplete="off">
+    <p class="hint">样例数据里有四家企业：甲科技有限公司、乙贸易有限公司、丙建材有限公司、上海某钢材贸易有限公司。
+      其中<b>乙贸易</b>有连续三个月社保异常，能触发阈值判定，适合用来看完整链路。</p>
+    <div class="btn-row">
+      <button id="run" onclick="runDecision()">开始决策</button>
+      <button class="ghost" onclick="document.getElementById('subject').value='甲科技有限公司'">换成甲科技</button>
+    </div>
+    <div id="result"></div>
+  </section>
+
+  <!-- 3 知识库 -->
+  <section class="card hidden" data-step="2">
+    <h2>知识库</h2>
+    <p class="lead">把政策文件、制度汇编等非结构化材料放进知识库，智能体提问时就能检索到它们。
+      这里的向量化由<b>本地模型</b>完成——不需要任何 API key，材料也不出本机。</p>
+    <div id="kb"><div class="empty">正在读取…</div></div>
+    <div class="btn-row">
+      <button onclick="loadKb(this)">刷新</button>
+    </div>
+    <p class="hint">向量化服务用 BGE-small-zh 中文模型。之所以不用 DeepSeek：
+      它的 API 只提供对话端点，<b>没有 embedding 端点</b>（<code>/v1/embeddings</code> 返回 404），
+      而把文本变成向量是检索的前提。</p>
+  </section>
+
+  <!-- 4 Nexent -->
+  <section class="card hidden" data-step="3">
+    <h2>在 Nexent 里用</h2>
+    <p class="lead">Nexent 是智能体平台。govfin 的 10 个工具通过 MCP 协议接进去，
+      三份 Skill 工作流作为模板导入，智能体就能在 Nexent 界面里直接对话。</p>
+    <div id="nexent"><div class="empty">正在读取…</div></div>
+    <div class="btn-row">
+      <button onclick="loadNexent(this)">刷新</button>
+      <a href="http://localhost:3000" target="_blank" style="text-decoration:none"><button class="ghost">打开 Nexent 界面</button></a>
+    </div>
+    <h3>怎么用</h3>
+    <div class="quote">1. 打开 Nexent → 资源仓库 → Agent 仓库</div>
+    <div class="quote">2. 点「导入」，选择桌面上的「跨域授信决策智能体.zip」</div>
+    <div class="quote">3. 完成后回到智能体列表，对它说：评估 乙贸易有限公司 的授信风险</div>
+    <p class="hint">导入包在 <code>Nexent导入件\</code>。用 <b>zip</b> 而不是 json —— zip 里带着三份工作流，一次装完。</p>
+  </section>
+
+</div>
+
+<script>
+const STEPS = [
+  {n:1, t:'检查服务'},
+  {n:2, t:'授信决策'},
+  {n:3, t:'知识库'},
+  {n:4, t:'Nexent 集成'},
+];
+let cur = 0;
+
+function renderSteps(){
+  document.getElementById('steps').innerHTML = STEPS.map((s,i)=>
+    `<div class="step ${i===cur?'on':''}" onclick="go(${i})"><span class="n">${s.n}</span>${s.t}</div>`
+  ).join('');
+}
+function go(i){
+  cur = i; renderSteps();
+  document.querySelectorAll('[data-step]').forEach(el=>{
+    el.classList.toggle('hidden', Number(el.dataset.step)!==i);
+  });
+  if(i===0) loadStatus();
+  if(i===2) loadKb();
+  if(i===3) loadNexent();
+}
+
+/* ---------- 状态 ---------- */
+async function loadStatus(btn){
+  const box = document.getElementById('status');
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>检查中'; }
+  box.innerHTML = '<div class="empty">正在检查…</div>';
+  try{
+    const r = await fetch('/api/status'); if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    let html = d.services.map(s=>`
+      <div class="row">
+        <span class="dot ${s.ok?'ok':'bad'}"></span>
+        <span class="lbl">${s.name}</span>
+        <span class="val">${s.detail}</span>
+      </div>`).join('');
+
+    const g = d.decision.graph;
+    if(g){
+      html += `<div class="row"><span class="dot ok"></span><span class="lbl">决策图谱</span>
+        <span class="val">${g.nodes} 节点 / ${g.edges} 边
+        ${d.decision.ontology_version?('｜本体 v'+d.decision.ontology_version):''}</span></div>`;
+    }else{
+      html += `<div class="row"><span class="dot bad"></span><span class="lbl">决策图谱</span>
+        <span class="val">读不到，决策服务可能没起来</span></div>`;
+    }
+
+    const nx = d.nexent;
+    html += `<div class="row"><span class="dot ${nx.registered?'ok':'warn'}"></span>
+      <span class="lbl">Nexent 注册</span>
+      <span class="val">${nx.registered ? ('已接入，'+nx.tools+' 个工具') : '未接入（见第 4 步）'}</span></div>`;
+    if(nx.models && nx.models.length){
+      html += `<div class="row"><span class="dot ok"></span><span class="lbl">已配模型</span>
+        <span class="val">${nx.models.map(m=>m.name).join('、')}</span></div>`;
+    }
+    if(nx.knowledges && nx.knowledges.length){
+      html += `<div class="row"><span class="dot ok"></span><span class="lbl">知识库</span>
+        <span class="val">${nx.knowledges.map(k=>k.name+'（'+k.docs+' 份）').join('、')}</span></div>`;
+    }
+    box.innerHTML = html;
+  }catch(e){
+    box.innerHTML = `<div class="err">检查失败：${e.message}</div>`;
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='重新检查'; }
+  }
+}
+
+/* ---------- 决策 ---------- */
+async function runDecision(){
+  const btn = document.getElementById('run');
+  const box = document.getElementById('result');
+  const subject = document.getElementById('subject').value.trim();
+  if(!subject){ box.innerHTML = '<div class="err">请先填写企业名称</div>'; return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>推理中';
+  box.innerHTML = '<div class="empty">正在核验登记、采集事实、做跨域推理…</div>';
+
+  try{
+    const r = await fetch('/api/decision', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({subject})
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.detail || ('HTTP '+r.status));
+    box.innerHTML = renderDecision(d);
+  }catch(e){
+    box.innerHTML = `<div class="err">${e.message}</div>`;
+  }finally{
+    btn.disabled = false; btn.textContent = '开始决策';
+  }
+}
+
+function verdictClass(v){
+  if(!v) return '';
+  if(v.includes('不予受理') || v.includes('证据不足')) return 'bad';
+  if(v.includes('审慎')) return 'warn';
+  return 'ok';
+}
+
+function renderDecision(d){
+  let h = '';
+
+  h += '<div class="chain">' + d.steps.map(s=>`
+    <div class="item"><span class="tag ${s.ok?'ok':''}">${s.name}</span>
+    <span>${s.summary||'—'}</span></div>`).join('') + '</div>';
+
+  if(d.halted){
+    h += `<div class="verdict bad"><span class="big">不予受理</span></div>
+      <div class="quote">${d.halted}</div>`;
+    return h;
+  }
+
+  if(d.verdict){
+    h += `<div class="verdict ${verdictClass(d.verdict)}">
+      <span class="big">${d.verdict}</span>
+      <span class="conf">置信度 ${d.confidence}</span>
+    </div>`;
+  }
+  if(d.rationale) h += `<div class="quote">${d.rationale}</div>`;
+
+  if(d.judgements && d.judgements.length){
+    h += '<h3>阈值判定</h3>';
+    d.judgements.forEach(j=>{
+      h += `<dl class="kv">
+        <dt>阈值名称</dt><dd>${j.threshold_name}</dd>
+        <dt>观测 / 阈值</dt><dd>${j.observed_value} ${j.triggered?'≥':'<'} ${j.threshold_value}　<b>${j.triggered?'已触发':'未触发'}</b></dd>
+        <dt>观测依据</dt><dd>${j.observed_basis||'—'}</dd>
+        <dt>依据条款</dt><dd>${j.clause_label||j.clause_node}</dd>
+      </dl>`;
+    });
+  }
+
+  const ev = d.evidence;
+  if(ev){
+    const chains = ev.accepted_chains || [];
+    h += `<h3>依据链（${chains.length} 条采纳${ev.drift_count?('，'+ev.drift_count+' 项漂移'):'，无漂移'}）</h3>`;
+    chains.slice(0,4).forEach(c=>{
+      h += `<div class="chain"><div class="item">
+        <span class="tag">${c.constraint||'—'}</span>
+        <span><b>${c.chain}</b><br>
+        <span style="color:var(--ink-3);font-size:13px">置信度 ${c.confidence}　·　${c.hops} 跳</span></span>
+      </div>`;
+      (c.evidence||[]).slice(0,3).forEach(e=>{
+        h += `<div class="item" style="padding-left:26px;border-bottom:0">
+          <span class="tag">${e.evidence_class==='direct'?'直接':'派生'}</span>
+          <span style="color:var(--ink-2);font-size:13.5px">${e.snippet||''}<br>
+          <span style="color:var(--ink-3);font-size:12.5px">${e.source_document||''}　${e.source_locator||''}</span></span>
+        </div>`;
+      });
+      h += '</div>';
+    });
+
+    if(ev.clauses && ev.clauses.length){
+      h += '<h3>依据条款原文</h3>';
+      ev.clauses.slice(0,2).forEach(c=>{
+        h += `<div class="quote"><b>${c.label||c.node}</b>\n${(c.text||c.原文||'').slice(0,400)}</div>`;
+      });
+    }
+  }
+  return h;
+}
+
+/* ---------- 知识库 ---------- */
+async function loadKb(btn){
+  const box = document.getElementById('kb');
+  if(btn){ btn.disabled=true; btn.textContent='读取中…'; }
+  box.innerHTML = '<div class="empty">正在读取…</div>';
+  try{
+    const r = await fetch('/api/kb'); const d = await r.json();
+    if(!d.ok){ box.innerHTML = `<div class="err">${d.error||'读取失败'}</div>`; return; }
+    if(!d.knowledges.length){
+      box.innerHTML = `<div class="empty">还没有知识库。<br>
+        在 Nexent 界面里：智能体开发 → 知识库配置 → 新建，<br>
+        向量化模型选 <code>BAAI/bge-small-zh-v1.5</code>（本地服务，无需 key）。</div>`;
+      return;
+    }
+    box.innerHTML = d.knowledges.map(k=>`
+      <div class="row"><span class="dot ok"></span>
+      <span class="lbl">${k.name}</span>
+      <span class="val">${k.docs} 份文档${k.embedding?('　·　'+k.embedding):''}</span></div>`).join('');
+  }catch(e){
+    box.innerHTML = `<div class="err">${e.message}</div>`;
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='刷新'; }
+  }
+}
+
+/* ---------- Nexent ---------- */
+async function loadNexent(btn){
+  const box = document.getElementById('nexent');
+  if(btn){ btn.disabled=true; btn.textContent='读取中…'; }
+  box.innerHTML = '<div class="empty">正在读取…</div>';
+  try{
+    const r = await fetch('/api/status'); const d = await r.json();
+    const nx = d.nexent;
+    let h = `<div class="row"><span class="dot ${nx.registered?'ok':'warn'}"></span>
+      <span class="lbl">MCP 服务</span>
+      <span class="val">${nx.registered ? ('govfin-decision　'+nx.tools+' 个工具已就绪') : '未注册'}</span></div>`;
+    h += `<div class="row"><span class="dot ${(nx.models||[]).length?'ok':'warn'}"></span>
+      <span class="lbl">大模型</span>
+      <span class="val">${(nx.models||[]).length ? nx.models.map(m=>m.name).join('、') : '未配置（去 Nexent 模型配置页添加）'}</span></div>`;
+    h += `<div class="row"><span class="dot ${(nx.knowledges||[]).length?'ok':'warn'}"></span>
+      <span class="lbl">知识库</span>
+      <span class="val">${(nx.knowledges||[]).length ? nx.knowledges.map(k=>k.name).join('、') : '尚未创建'}</span></div>`;
+    box.innerHTML = h;
+  }catch(e){
+    box.innerHTML = `<div class="err">${e.message}</div>`;
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='刷新'; }
+  }
+}
+
+renderSteps();
+loadStatus();
+</script>
+</body>
+</html>

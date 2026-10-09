@@ -50,3 +50,6 @@ reports/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 控制台与向量化服务的构建上下文里不需要业务代码
+console/static/.cache/
