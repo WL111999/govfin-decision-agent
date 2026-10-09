@@ -26,7 +26,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -321,6 +321,173 @@ def api_kb() -> dict:
             for k in (data.get("indices_info") or []) if isinstance(k, dict)
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# 拖拽导入
+# ---------------------------------------------------------------------------
+
+# 按扩展名决定这份材料该去哪儿。两条路的用途不同：
+#   图  —— 结构化事实（谁、什么时候、什么状态），用来做推理和阈值判定
+#   知识库 —— 制度性文本（条款、制度、文书），用来回答"按规定该怎么办"
+# 放错地方的后果不是报错，是"明明导进去了却搜不到"。
+STRUCTURED_SUFFIXES = {".json", ".csv"}
+TEXT_SUFFIXES = {".txt", ".pdf", ".png", ".jpg", ".jpeg"}
+
+
+@app.post("/api/upload")
+async def api_upload(files: list[UploadFile] = File(...)) -> dict:
+    """把拖进来的文件送到该去的地方。
+
+    路由规则简单说：**结构化数据进图，叙述性材料进知识库**。
+
+    这个判断不能交给用户做。同一个 PDF，是"这份财报的表格数据"还是"这份制度
+    文件的条款"，用途完全不同——而用户拖文件的时候心里想的是"我要用这个"，
+    不是"这该进哪一层"。前端按扩展名猜，猜错了把两条路都试一遍的成本很低，
+    让用户先理解架构再拖的成本很高。
+    """
+    results: list[dict] = []
+    graph_files: list[tuple[str, bytes]] = []
+    kb_files: list[tuple[str, bytes]] = []
+
+    for upload in files:
+        name = upload.filename or "unnamed"
+        raw = await upload.read()
+        if not raw:
+            results.append({"name": name, "ok": False, "error": "空文件"})
+            continue
+        suffix = pathlib.Path(name).suffix.lower()
+        if suffix in STRUCTURED_SUFFIXES:
+            graph_files.append((name, raw))
+        elif suffix in TEXT_SUFFIXES:
+            kb_files.append((name, raw))
+        else:
+            results.append({
+                "name": name, "ok": False,
+                "error": f"不支持的类型 '{suffix}'，支持："
+                         f"{', '.join(sorted(STRUCTURED_SUFFIXES | TEXT_SUFFIXES))}",
+            })
+
+    for name, raw in graph_files:
+        results.append(_ingest_to_graph(name, raw))
+    if kb_files:
+        results.extend(_ingest_to_kb(kb_files))
+
+    return {
+        "ok": all(r.get("ok") for r in results) if results else False,
+        "routed": {"graph": len(graph_files), "knowledge_base": len(kb_files)},
+        "results": results,
+    }
+
+
+def _ingest_to_graph(name: str, raw: bytes) -> dict:
+    import base64
+
+    client = McpClient(GOVFIN_MCP)
+    if not client.connect():
+        return {"name": name, "target": "图谱", "ok": False,
+                "error": "连不上 govfin 决策服务"}
+    res = client.call("ingest_document", {
+        "content": base64.b64encode(raw).decode("ascii"),
+        "filename": name,
+    }, rid=9)
+    if not isinstance(res, dict):
+        return {"name": name, "target": "图谱", "ok": False, "error": "工具返回异常"}
+    if not res.get("ok"):
+        return {"name": name, "target": "图谱", "ok": False,
+                "error": res.get("error") or "导入失败"}
+
+    delta = res.get("graph_delta") or {}
+    parts = [
+        f"新增 {delta.get('nodes', 0)} 节点 / {delta.get('edges', 0)} 边",
+        f"{res.get('tuples', 0)} 个元组",
+    ]
+    if res.get("entities_merged"):
+        parts.append(f"归并 {res['entities_merged']} 个实体")
+    if res.get("constrained_edges"):
+        parts.append(f"绑定 {res['constrained_edges']} 条规则边")
+    # 被拒绝的必须报出来：报告里写着"导入成功"而实际少了个字段，
+    # 和真的全部成功在界面上长得一模一样。
+    if res.get("rejected_count"):
+        parts.append(f"**{res['rejected_count']} 个值被拒**")
+    return {
+        "name": name, "target": "图谱", "ok": True,
+        "detail": "，".join(parts),
+        "rejected": res.get("rejected") or [],
+        "graph_total": res.get("graph_total"),
+    }
+
+
+def _ingest_to_kb(files: list[tuple[str, bytes]]) -> list[dict]:
+    token = _nexent_token()
+    if not token:
+        return [{"name": n, "target": "知识库", "ok": False,
+                 "error": "未配置 Nexent 凭据"} for n, _ in files]
+
+    auth = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    status, raw = _http("GET", f"{NEXENT_API}/indices?include_stats=true", headers=auth)
+    if status != 200:
+        return [{"name": n, "target": "知识库", "ok": False, "error": "读不到知识库列表"} for n, _ in files]
+    items = (_json_or(raw, {}) or {}).get("indices_info") or []
+    index_name = next((i.get("name") for i in items if isinstance(i, dict)), None)
+    if not index_name:
+        return [{"name": n, "target": "知识库", "ok": False,
+                 "error": "还没有知识库，请先在 Nexent 里建一个"} for n, _ in files]
+
+    boundary = "----govfinConsoleUpload"
+    parts: list[bytes] = []
+    for field, value in (("index_name", index_name), ("destination", "minio"),
+                         ("folder", "knowledge_base")):
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"\r\n\r\n{value}\r\n'.encode())
+    for name, content in files:
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{name}"\r\n'
+            f"Content-Type: application/octet-stream\r\n\r\n".encode()
+        )
+        parts.append(content)
+        parts.append(b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode())
+    body = b"".join(parts)
+
+    status, resp = _http(
+        "POST", f"{NEXENT_API}/file/upload",
+        headers={"Authorization": f"Bearer {token}",
+                 "Content-Type": f"multipart/form-data; boundary={boundary}",
+                 "User-Agent": "AgentFrontEnd/1.0"},
+        body=body, timeout=180,
+    )
+    if status not in (200, 201):
+        return [{"name": n, "target": "知识库", "ok": False, "error": f"上传失败 HTTP {status}"} for n, _ in files]
+
+    payload = _json_or(resp, {}) or {}
+    uploaded = payload.get("uploaded_file_paths") or []
+    filenames = payload.get("uploaded_filenames") or []
+    records = payload.get("file_records") or []
+    if not uploaded:
+        return [{"name": n, "target": "知识库", "ok": False, "error": "上传返回里没有文件路径"} for n, _ in files]
+
+    to_process = [
+        {"path_or_url": path,
+         "filename": filenames[i] if i < len(filenames) else pathlib.Path(path).name,
+         "file_id": next((r.get("file_id") for r in records if r.get("object_name") == path), None)}
+        for i, path in enumerate(uploaded)
+    ]
+    status, resp = _http(
+        "POST", f"{NEXENT_API}/file/process",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        payload={"files": to_process, "index_name": index_name,
+                 "destination": "minio", "chunking_strategy": "basic"},
+        timeout=180,
+    )
+    if status not in (200, 201):
+        return [{"name": n, "target": "知识库", "ok": False,
+                 "error": f"触发切块失败 HTTP {status}"} for n, _ in files]
+
+    return [
+        {"name": n, "target": "知识库", "ok": True,
+         "detail": "已上传，正在后台切块向量化（约半分钟）"}
+        for n, _ in files
+    ]
 
 
 # ---------------------------------------------------------------------------

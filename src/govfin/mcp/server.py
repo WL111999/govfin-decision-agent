@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import sys
 from typing import Any
 
@@ -176,6 +177,85 @@ def build_server(runtime: AgentRuntime, *, host: str = "0.0.0.0", port: int = 89
                 "issues": integrity.get("issues", [])[:10],
             },
             "ontology_version": runtime.ontology.version,
+        }
+
+    @server.tool(
+        name="ingest_document",
+        description=(
+            "导入一份材料到知识图谱。接受 JSON（政务记录数组）、CSV（表格）、"
+            "TXT（正文）、PDF 与营业执照图片。\n"
+            "用途：把新出现的材料变成图上可推理的事实。导入后同一批里的实体"
+            "会自动归并、规则会自动绑定。\n"
+            "返回的 report 里 **skipped 不为空表示有文件没读进去**——那些材料"
+            "在图上不存在，后续推理不会用到它们，必须让调用方看见。"
+        ),
+    )
+    def ingest_document(
+        content: str,
+        filename: str,
+        encoding: str = "utf-8",
+    ) -> dict:
+        """把一份材料写进图。
+
+        content 是文件内容的 base64。为什么用 base64 而不是纯文本：这个工具要收
+        的不只是文本——营业执照是二进制图片，财务报表皮是 PDF。用 JSON 传二进制的
+        常规做法就是 base64，而 MCP 的参数本来就是 JSON。
+
+        这里刻意做成"一次一份"而不是"一次一批"：批量的失败定位成本高得多——
+        一份坏文件混在里面，调用方只知道"这批失败了"，不知道是哪一份、为什么。
+        """
+        import base64
+        import binascii
+
+        from govfin.ingest.parsers import parse_bytes
+
+        try:
+            raw = base64.b64decode(content, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            return {"ok": False, "error": f"content 不是合法的 base64: {exc}"}
+
+        suffix = pathlib.Path(filename).suffix.lower() or ".txt"
+        if suffix not in (".json", ".csv", ".txt", ".pdf", ".png", ".jpg", ".jpeg"):
+            return {
+                "ok": False,
+                "error": f"不支持的文件类型 '{suffix}'",
+                "supported": [".json", ".csv", ".txt", ".pdf", ".png", ".jpg", ".jpeg"],
+            }
+
+        try:
+            doc = parse_bytes(raw, source=filename, suffix=suffix)
+        except Exception as exc:  # noqa: BLE001 - 前端拿到原因比拿到 traceback 有用
+            return {"ok": False, "error": f"解析失败：{type(exc).__name__}: {exc}"}
+
+        before = runtime.store.stats()
+        try:
+            result = runtime.extractor.extract(doc)
+            report = runtime.loader.load(result)
+            consolidation = runtime.loader.consolidate()
+            binding = runtime.binder.bind()
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": f"装载失败：{type(exc).__name__}: {exc}"}
+
+        after = runtime.store.stats()
+        binding_dict = binding.to_dict() if hasattr(binding, "to_dict") else {}
+        return {
+            "ok": True,
+            "filename": filename,
+            "modality": doc.modality,
+            "blocks": len(doc.blocks),
+            "tuples": len(result.tuples),
+            "nodes_created": report.nodes_created,
+            "edges_created": report.edges_created,
+            "entities_merged": consolidation.merged_count,
+            "tuples_routed_to_unk": report.tuples_routed_to_unk,
+            "rejected": report.rejected[:10],
+            "rejected_count": len(report.rejected),
+            "constrained_edges": binding_dict.get("constrained_edges", 0),
+            "graph_delta": {
+                "nodes": after.get("nodes", 0) - before.get("nodes", 0),
+                "edges": after.get("edges", 0) - before.get("edges", 0),
+            },
+            "graph_total": {"nodes": after.get("nodes", 0), "edges": after.get("edges", 0)},
         }
 
     return server

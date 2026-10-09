@@ -44,8 +44,76 @@ def test_mcp_registers_all_tools(runtime):
         "ontology_status",
         "ontology_evolve",
         "graph_stats",
+        "ingest_document",
     }
     assert expected <= names
+
+
+def test_ingest_document_rejects_bad_input_without_raising(mutable_runtime):
+    """坏输入要返回 ok=false，不是抛异常。
+
+    MCP 工具抛异常时，调用方（Nexent 的智能体）拿到的是一个工具执行失败，
+    它没法据此判断"是我传错了"还是"服务挂了"——只能整个流程失败。返回结构化
+    错误则能让模型自己修正参数重试。
+    """
+    import asyncio
+
+    from govfin.mcp.server import build_server
+
+    server = build_server(mutable_runtime)
+
+    bad_cases = [
+        ({"content": "这不是base64!!!", "filename": "x.json"}, "非法 base64"),
+        ({"content": "aGVsbG8=", "filename": "x.exe"}, "不支持的扩展名"),
+    ]
+    for args, label in bad_cases:
+        result = asyncio.run(server.call_tool("ingest_document", args))
+        payload = _payload(result)
+        assert payload.get("ok") is False, f"{label} 应当被拒绝: {payload}"
+        assert payload.get("error"), f"{label} 的拒绝理由不能为空"
+
+
+def test_ingest_document_actually_puts_material_on_the_graph(mutable_runtime):
+    """导入要真的落图，且返回的增量与图的实际变化一致。
+
+    只断言"没报错"是没用的：导入最危险的失效是**静默什么也没做**——
+    返回 ok=true、图却没变，用户以为材料进去了，后面每一步推理都看不见它。
+    """
+    import asyncio
+    import base64
+
+    from govfin.mcp.server import build_server
+
+    before = mutable_runtime.store.stats()["nodes"]
+    records = [
+        {
+            "记录编号": "GS-2026-8801",
+            "统一社会信用代码": "91310115MA1K3XYL11",
+            "企业名称": "巳物流有限公司",
+            "注册资本": 800.0,
+            "成立日期": "2021-03-09",
+        }
+    ]
+    content = base64.b64encode(json.dumps(records, ensure_ascii=False).encode("utf-8")).decode("ascii")
+
+    server = build_server(mutable_runtime)
+    result = asyncio.run(
+        server.call_tool("ingest_document", {"content": content, "filename": "新到材料.json"})
+    )
+    payload = _payload(result)
+    assert payload.get("ok") is True, payload
+
+    after = mutable_runtime.store.stats()["nodes"]
+    assert after > before, "返回 ok=true 但图上没有任何变化"
+
+    delta = payload.get("graph_delta") or {}
+    assert after - before == delta.get("nodes"), (
+        f"返回的增量 {delta.get('nodes')} 与图的实际变化 {after - before} 对不上"
+    )
+
+    hit = mutable_runtime.store.find_by_prop("名称", "巳物流有限公司", ntype="企业")
+    assert hit, "导入的企业在图上查不到"
+    assert hit[0]["props"].get("统一社会信用代码") == "91310115MA1K3XYL11"
 
 
 def test_mcp_tools_never_raise_on_bad_input(runtime):

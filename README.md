@@ -26,13 +26,26 @@
 |---|---|---|
 | ① 多模态异构数据统一识别与理解 | 五元组统一表征（实体/类型/属性/关系/证据），文本 · 表格 · JSON · PDF · 图像五类解析器，OCR 四后端按能力降级 | `src/govfin/ingest/parsers/`；一页营业执照 10 个字段全解析 |
 | ② 低资源本体**半自动**构建与持续更新 | UNK 储备池 + 神经符号管道：聚类 → 别名学习 → 提案 → 一致性验证 → 自动采纳/人工仲裁 → 图重索引；版本链留痕 | `0.1.0 → 0.2.0` 实测一轮：5 候选聚类、1 别名学习、2 转仲裁、2 如实拒绝 |
-| ③ 深度集成 MCP 协议与 Skills 编排 | MCP 服务暴露 **10 个领域工具**；3 份 SKILL.md 工作流模板；A2A 侧 **7 智能体**协作拓扑 | `deploy/mcp_config.json`；`nexent/skills/`；实测握手 + 工具调用全通过 |
+| ③ 深度集成 MCP 协议与 Skills 编排 | MCP 服务暴露 **11 个领域工具**；3 份 SKILL.md 工作流模板；A2A 侧 **7 智能体**协作拓扑 | `deploy/mcp_config.json`；`nexent/skills/`；实测握手 + 工具调用全通过 |
 | ④ "检索—推理"双驱动协同执行流 | 四阶段编排：检索 → 推理 → 决策 → 溯源；阶段间传**证据**而非摘要 | A2A `message/send` 实测返回完整编排日志（8 步） |
 | ⑤ 跨文档多跳推理与**可追溯决策链** | 修正衰减置信度模型（`geo × hop × btn`）+ 约束路径搜索 + Layer3 决策快照 + **依据漂移检测** | 样例主体：7 条采纳链、0 条被拒链、逐环证据可回指 `record:4/缴纳状态` |
 | ⑥ 可复用、快速部署的 Skill 模板 | 3 份 Skill（真实性核验 / 风险传导扫描 / 决策链生成），含 `allowed-tools`、适用与**不适用**边界、示例 | `nexent/skills/*/SKILL.md`；`dist/*.zip` 可直接导入 Nexent |
-| ⑦ 必须能在 Nexent 平台运行 | 容器化部署件 + 一键注册脚本；已在 Nexent v2.6.0 全量部署上打通 | `deploy/`、`scripts/register_to_nexent.py` |
+| ⑦ 必须能在 Nexent 平台运行 | 一键部署脚本 + 容器化部署件 + 控制台界面；已在 Nexent v2.6.0 全量部署上打通 | `scripts/one_click_deploy.py`、`console/`、`deploy/` |
 
-## 三、快速开始（不需要任何外部依赖）
+## 三、快速开始
+
+### 一条命令跑起来（推荐）
+
+```bash
+python -X utf8 scripts/one_click_deploy.py
+```
+
+跑完打开 **http://localhost:8090**。控制台按「检查服务 → 授信决策 → 知识库 →
+导入材料 → Nexent 集成」五步排好，每步显示当前状态和该做什么。
+
+脚本幂等，随时可以再跑一次。详见 [`docs/一键部署与控制台.md`](docs/一键部署与控制台.md)。
+
+### 不需要任何外部依赖的本地跑法
 
 ```bash
 pip install -e ".[dev]"
@@ -64,7 +77,7 @@ python -X utf8 -m govfin.cli doctor
 ### 起服务
 
 ```bash
-# MCP 工具服务（Nexent 通过它接入 10 个领域工具）
+# MCP 工具服务（Nexent 通过它接入 11 个领域工具）
 python -X utf8 -m govfin.mcp.server --transport streamable-http --port 8930 --ingest data
 
 # A2A 协作服务（Agent Card 发现 + JSON-RPC 任务接口）
@@ -76,7 +89,7 @@ python -X utf8 -m govfin.a2a.server --port 8940 --ingest data
 ```
                         ┌──────────────────────────────────────────┐
    Nexent 平台           │  Skills 编排（3 份 SKILL.md 模板）        │
-                        │  MCP 客户端 ──► 10 个领域工具             │
+                        │  MCP 客户端 ──► 11 个领域工具             │
                         └────────────────┬─────────────────────────┘
                                          │ MCP / A2A
    ┌─────────────────────────────────────▼─────────────────────────────────────┐
@@ -130,12 +143,12 @@ python -X utf8 -m govfin.a2a.server --port 8940 --ingest data
 | 触发依据 | `连续异常月数上限` 观测 3 ≥ 阈值 3（条款 银保监发〔2024〕12号-§4.1） |
 | 采纳推理链 | 7 条（逐环带 `source_document` + `source_locator`） |
 | 依据漂移 | 0 项 |
-| 测试 | **248 条用例全部通过**（235 回归 + 13 规模压力） |
+| 测试 | **250 条用例全部通过**（237 回归 + 13 规模压力） |
 
 ## 六、测试
 
 ```bash
-python -X utf8 -m pytest -q              # 235 条，约 6 秒
+python -X utf8 -m pytest -q              # 237 条，约 7 秒
 python -X utf8 -m pytest -q -m stress    # 追加 13 条十万级规模压力
 ```
 
@@ -152,7 +165,7 @@ Dockerfile 里两处会让容器根本起不来的写法。
 
 详见 [`docs/测试报告.md`](docs/测试报告.md)，含每个缺陷的根因与**变异验证**结果
 （回退修复 → 断言测试必须变红；首轮 9 处变异有 2 处没被抓到，因此补了针对性用例，
-当前 11/11 全检出）。
+当前 13/13 全检出）。
 
 ## 七、目录
 
@@ -163,14 +176,14 @@ src/govfin/
   reasoning/  约束路径搜索 · 授信决策 · 审计与漂移检测
   evolution/  UNK 储备池 · 聚类 · 别名学习 · 提案 · 演化管道
   ontology/   本体模型 · 种子本体（49 类 / 102 属性）
-  mcp/        MCP 工具服务（10 个工具）
+  mcp/        MCP 工具服务（11 个工具）
   a2a/        A2A 协作拓扑（7 智能体）
   llm/        LLM 客户端（DeepSeek / OpenAI 兼容 / 离线确定性）
 nexent/skills/  3 份 Skill 工作流模板 + 可直接导入的 zip
 deploy/         容器化部署件 · Nexent 接入配置
 docs/           架构 · 置信度模型 · 本体演化 · 决策溯源 · 测试报告
 data/           样例多模态数据集（含 OCR 边车）
-tests/          245 条用例
+tests/          250 条用例
 ```
 
 ## 八、文档
@@ -182,6 +195,7 @@ tests/          245 条用例
 | [`docs/ontology-evolution.md`](docs/ontology-evolution.md) | 半自动本体构建的完整闭环与一致性验证 |
 | [`docs/provenance.md`](docs/provenance.md) | 决策溯源与依据漂移检测 |
 | [`docs/nexent-integration.md`](docs/nexent-integration.md) | Nexent 对接步骤（MCP 注册 + Skill 导入 + 同网部署） |
+| [`docs/一键部署与控制台.md`](docs/一键部署与控制台.md) | 一条命令部署、控制台五个步骤、拖拽导入、本地向量化服务 |
 | [`docs/测试报告.md`](docs/测试报告.md) | 暴力测试全过程与缺陷清单 |
 
 ## 九、诚实的边界

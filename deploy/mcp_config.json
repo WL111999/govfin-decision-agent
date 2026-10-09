@@ -13,7 +13,6 @@
       "额外字段": "导入时还需在界面上填 containerPort（容器内暴露端口）与服务名。"
     }
   },
-
   "mcpServers": {
     "govfin-decision": {
       "command": "python",
@@ -37,7 +36,6 @@
       "image": "govfin-decision-agent:1.0.0"
     }
   },
-
   "expectedTools": [
     "gov_business_lookup",
     "gov_social_security",
@@ -48,9 +46,9 @@
     "evidence_bundle",
     "ontology_status",
     "ontology_evolve",
-    "graph_stats"
+    "graph_stats",
+    "ingest_document"
   ],
-
   "toolRouting": [
     {
       "tool": "gov_business_lookup",
@@ -101,6 +99,11 @@
       "tool": "graph_stats",
       "skill": "*",
       "when": "调用前确认图谱已加载。"
+    },
+    {
+      "tool": "ingest_document",
+      "skill": "*",
+      "when": "新到一批材料需要进图时。导入后同一批的实体自动归并、规则自动绑定；返回里的 skipped 非空表示有文件没读进去。"
     }
   ]
 }

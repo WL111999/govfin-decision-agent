@@ -73,7 +73,11 @@ DUTY_PROMPT = """你是金融+政务跨域授信决策智能体。你的职责�
    一起呈现给用户。
 
 本体覆盖不足时（ontology_status 显示 UNK 储备池堆积），调用 ontology_evolve
-触发一轮演化。未过一致性验证的提案会转入人工仲裁，这是设计内的，不是失败。"""
+触发一轮演化。未过一致性验证的提案会转入人工仲裁，这是设计内的，不是失败。
+
+如果用户提供了一份**还没有进图**的材料（新的工商登记、社保记录、判决书等），
+用 ingest_document 把它导进去再做分析。导入是把材料变成图上可推理的事实，
+不是可有可无的准备动作——图里没有的事实，后面的每一步都看不见。"""
 
 CONSTRAINT_PROMPT = """- 只使用工具返回的数据。**不要凭常识或记忆补充任何企业事实**——
   政务金融场景里，一个编造的统一社会信用代码比一句"我不知道"危险得多。
@@ -241,7 +245,7 @@ def main() -> int:
              "output_type": "object", "params": {}, "source": "mcp", "usage": MCP_SERVER_NAME}
             for n in (
                 "evidence_bundle", "fin_financial_parser", "gov_business_lookup", "gov_judicial_scan",
-                "gov_social_security", "graph_stats", "kg_path_query", "ontology_evolve",
+                "gov_social_security", "graph_stats", "ingest_document", "kg_path_query", "ontology_evolve",
                 "ontology_status", "risk_decision",
             )
         ]

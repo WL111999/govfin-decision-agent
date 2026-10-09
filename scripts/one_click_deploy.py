@@ -48,6 +48,14 @@ CONTAINERS = {
         "context": ".",
         "ports": ["8930:8930", "8940:8940"],
         "alias": "govfin-agent",
+        # 数据卷**必须挂**。图数据库默认写在容器的可写层里，而那层会随
+        # `docker rm` + `docker run` 一起消失——也就是每次 --rebuild 重建容器，
+        # 导入的材料和全部决策痕迹都没了。
+        #
+        # 决策痕迹丢了就答不出"当初为什么这么判"，而这正是这套系统的核心能力。
+        # 更麻烦的是它**不报错**：重建后图是干净的样例状态，一切正常运行，
+        # 只是用户导入过的东西凭空不见了。
+        "volumes": ["govfin-graph-data:/app/data"],
     },
     "govfin-embedding": {
         "image": "govfin-embedding:1.0.0",
@@ -206,8 +214,11 @@ def do_containers(docker: str, total: int, argv: list[str]) -> bool:
             port_args: list[str] = []
             for mapping in spec["ports"]:
                 port_args += ["-p", mapping]
+            volume_args: list[str] = []
+            for mount in spec.get("volumes", []):
+                volume_args += ["-v", mount]
             cmd = [docker, "run", "-d", "--name", name, "--restart", "unless-stopped",
-                   *port_args, *env_args.get(name, []), spec["image"]]
+                   *port_args, *volume_args, *env_args.get(name, []), spec["image"]]
             r = run(cmd, timeout=300)
             if r.returncode != 0:
                 fail(f"启动 {name} 失败：{(r.stderr or r.stdout or '')[:400]}")

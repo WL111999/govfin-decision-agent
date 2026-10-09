@@ -106,6 +106,20 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "                continue\n",
         "tests/test_ingest_completeness.py::test_ingest_reports_skipped_documents_instead_of_swallowing_them",
     ),
+    (
+        "导入工具对非法 base64 也报成功",
+        "src/govfin/mcp/server.py",
+        '            return {"ok": False, "error": f"content 不是合法的 base64: {exc}"}\n',
+        '            return {"ok": True}\n',
+        "tests/test_mcp_a2a.py::test_ingest_document_rejects_bad_input_without_raising",
+    ),
+    (
+        "导入工具报出的增量与图的实际变化不符",
+        "src/govfin/mcp/server.py",
+        '                "nodes": after.get("nodes", 0) - before.get("nodes", 0),\n',
+        '                "nodes": 0,\n',
+        "tests/test_mcp_a2a.py::test_ingest_document_actually_puts_material_on_the_graph",
+    ),
 ]
 
 

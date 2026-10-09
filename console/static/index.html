@@ -110,6 +110,28 @@ code{background:#f2f4f9;padding:2px 7px;border-radius:5px;font-size:12.5px;font-
 .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:14px;margin:14px 0}
 .kv dt{color:var(--ink-3);font-size:13px}
 .kv dd{color:var(--ink)}
+
+/* 拖拽区：默认是虚线的"空盒子"，拖进来时才亮起来。
+   视觉反馈要发生在**放手之前**——拖到一半不知道能不能放，是最让人犹豫的状态。 */
+.drop{
+  border:1.5px dashed var(--line);border-radius:14px;padding:38px 24px;text-align:center;
+  transition:.18s;cursor:pointer;background:var(--card);
+}
+.drop:hover{border-color:#c3c9d8;background:#fcfcfe}
+.drop.over{border-color:var(--accent);background:var(--accent-soft);border-style:solid}
+.drop .big{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:7px}
+.drop .sub{font-size:13px;color:var(--ink-3);line-height:1.9}
+.drop .ico{font-size:26px;margin-bottom:11px;opacity:.32}
+.res{margin-top:18px}
+.res .item{
+  display:flex;gap:11px;align-items:flex-start;padding:11px 14px;border-radius:9px;
+  background:#f7f8fc;margin-bottom:8px;font-size:13.5px;
+}
+.res .item.ok{background:#f2faf7}
+.res .item.bad{background:#fdf4f3}
+.res .tag2{font-size:11.5px;padding:2px 9px;border-radius:20px;background:#e6e8f0;color:var(--ink-2);flex:none;font-weight:500}
+.res .item.ok .tag2{background:#d9f0e6;color:var(--ok)}
+.res .item.bad .tag2{background:#f6dcd8;color:var(--bad)}
 </style>
 </head>
 <body>
@@ -166,8 +188,35 @@ code{background:#f2f4f9;padding:2px 7px;border-radius:5px;font-size:12.5px;font-
       而把文本变成向量是检索的前提。</p>
   </section>
 
-  <!-- 4 Nexent -->
+  <!-- 4 导入材料 -->
   <section class="card hidden" data-step="3">
+    <h2>导入材料</h2>
+    <p class="lead">把文件拖到下面的框里。系统会按类型自动送到该去的地方——
+      你不需要先弄明白"该进哪一层"。</p>
+
+    <div class="drop" id="drop">
+      <div class="ico">⬇</div>
+      <div class="big">拖文件到这里，或点击选择</div>
+      <div class="sub">
+        <b>结构化数据 → 知识图谱</b>　.json / .csv<br>
+        <span style="font-size:12px">工商登记、社保记录、行政处罚——变成图上可推理的事实</span><br>
+        <b>制度与文书 → 知识库</b>　.txt / .pdf / .png / .jpg<br>
+        <span style="font-size:12px">监管条款、征信报告、判决书——回答"按规定该怎么办"时检索用</span>
+      </div>
+      <input type="file" id="fileInput" multiple
+             accept=".json,.csv,.txt,.pdf,.png,.jpg,.jpeg" style="display:none">
+    </div>
+    <div class="res" id="uploadRes"></div>
+    <div class="btn-row">
+      <button onclick="loadStatus()">刷新状态</button>
+    </div>
+    <p class="hint">导入是<b>追加</b>语义，不会覆盖已有数据。同一份文件重复导入不会
+      让节点翻倍（节点按提及文本去重），但会新增边——需要干净重来时，
+      重建 Docker 卷即可。</p>
+  </section>
+
+  <!-- 5 Nexent -->
+  <section class="card hidden" data-step="4">
     <h2>在 Nexent 里用</h2>
     <p class="lead">Nexent 是智能体平台。govfin 的 10 个工具通过 MCP 协议接进去，
       三份 Skill 工作流作为模板导入，智能体就能在 Nexent 界面里直接对话。</p>
@@ -190,7 +239,8 @@ const STEPS = [
   {n:1, t:'检查服务'},
   {n:2, t:'授信决策'},
   {n:3, t:'知识库'},
-  {n:4, t:'Nexent 集成'},
+  {n:4, t:'导入材料'},
+  {n:5, t:'Nexent 集成'},
 ];
 let cur = 0;
 
@@ -227,7 +277,7 @@ function go(i){
   if(IS_FILE_PROTOCOL) return;   // 各步的 load* 自己会给出提示
   if(i===0) loadStatus();
   if(i===2) loadKb();
-  if(i===3) loadNexent();
+  if(i===4) loadNexent();
 }
 
 /* ---------- 状态 ---------- */
@@ -420,6 +470,62 @@ async function loadNexent(btn){
     box.innerHTML = `<div class="err">${e.message}</div>`;
   }finally{
     if(btn){ btn.disabled=false; btn.textContent='刷新'; }
+  }
+}
+
+/* ---------- 拖拽导入 ---------- */
+(function initDrop(){
+  const drop = document.getElementById('drop');
+  const input = document.getElementById('fileInput');
+  if(!drop) return;
+
+  drop.addEventListener('click', ()=>{ if(!IS_FILE_PROTOCOL) input.click(); });
+
+  // dragover 必须 preventDefault，否则浏览器会当作"打开这个文件"——
+  // 结果是页面被替换成文件内容，而用户以为自己只是拖了一下。
+  ['dragenter','dragover'].forEach(ev=>
+    drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>
+    drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+
+  drop.addEventListener('drop', e=>{
+    if(IS_FILE_PROTOCOL){ ifFileProtocol(document.getElementById('uploadRes')); return; }
+    const files = e.dataTransfer?.files;
+    if(files && files.length) upload(files);
+  });
+  input.addEventListener('change', ()=>{ if(input.files.length) upload(input.files); });
+})();
+
+async function upload(files){
+  const box = document.getElementById('uploadRes');
+  const names = Array.from(files).map(f=>f.name);
+  box.innerHTML = `<div class="item"><span class="tag2">处理中</span>
+    <span>正在导入 ${names.length} 个文件：${names.join('、')}…</span></div>`;
+
+  const fd = new FormData();
+  for(const f of files) fd.append('files', f);
+
+  try{
+    const r = await fetch('/api/upload', {method:'POST', body: fd});
+    const d = await r.json();
+    if(!d.results){ box.innerHTML = `<div class="item bad"><span class="tag2">失败</span>
+      <span>${d.detail || '上传失败'}</span></div>`; return; }
+    box.innerHTML = d.results.map(x=>{
+      const cls = x.ok ? 'ok' : 'bad';
+      const head = `${x.name}　<span class="tag2">${x.target||''}</span>`;
+      const body = x.ok ? (x.detail||'导入成功')
+                        : `<span style="color:var(--bad)">${x.error||'失败'}</span>`;
+      const rej = (x.rejected && x.rejected.length)
+        ? `<br><span style="font-size:12px;color:var(--warn)">被拒的值：` +
+          x.rejected.map(v=>v.field||v.mention||'?').join('、') + `</span>` : '';
+      return `<div class="item ${cls}"><span class="tag2">${x.ok?'成功':'失败'}</span>
+        <span>${head}<br>${body}${rej}</span></div>`;
+    }).join('');
+    if(d.routed) box.innerHTML += `<div class="item"><span class="tag2">去向</span>
+      <span>图谱 ${d.routed.graph} 份　知识库 ${d.routed.knowledge_base} 份</span></div>`;
+  }catch(e){
+    box.innerHTML = `<div class="item bad"><span class="tag2">失败</span>
+      <span>${e.message}</span></div>`;
   }
 }
 
