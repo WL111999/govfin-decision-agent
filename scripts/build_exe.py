@@ -57,6 +57,7 @@ HIDDEN_IMPORTS = [
     "paths",
     "deploy",
     "server",
+    "logging_setup",
 ]
 
 

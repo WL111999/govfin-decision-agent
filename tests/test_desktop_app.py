@@ -333,3 +333,143 @@ def test_broken_config_does_not_crash(app_paths, tmp_path, monkeypatch):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("{ this is not json", encoding="utf-8")
     assert app_paths.load_config() == {}
+
+
+# ---------------------------------------------------------------------------
+# 无控制台环境（打包成 --windowed 之后的真实处境）
+#
+# 这一段盯的是一个**只在打包后才出现**的失效：exe 双击后静默退出，
+# 没有任何提示、没有任何日志。根因是 sys.stdout/sys.stderr 为 None，
+# 而 uvicorn 会调 `sys.stdout.isatty()` 来决定要不要上色。
+#
+# 不写这条测试的话，它在开发时永远不复现（开发态标准流是好的），
+# 只有用户双击时才会遇到——而那时你手上一条线索都没有。
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def app_logging():
+    return _load("_app_logging", "app/logging_setup.py")
+
+
+def test_log_stream_survives_the_calls_libraries_actually_make(app_logging):
+    """补上的标准流必须能应付库真实会调的那些方法。
+
+    特别是 `isatty()` —— uvicorn 的 DefaultFormatter 在 __init__ 里就调它，
+    返回值得是布尔，缺了这个方法就是一个 AttributeError。
+    """
+    stream = app_logging._LogStream("test")
+    assert stream.isatty() is False, "isatty 必须返回布尔，uvicorn 靠它决定要不要上色"
+    assert stream.writable() is True
+    assert stream.encoding == "utf-8"
+    # 写入要能被接受（返回字符数），哪怕内容会被转进日志
+    assert stream.write("hello") == 5
+    assert stream.flush() is None
+    with pytest.raises(OSError):
+        stream.fileno()  # 没有真实 fd，抛 OSError 是 io 的约定
+
+
+def test_install_streams_fills_only_missing_ones(app_logging, monkeypatch):
+    """只补 None 的那些。
+
+    开发态跑 `python app/main.py` 时标准流是好的，替换掉反而让人看不到输出。
+    """
+    import io
+    import sys as _sys
+
+    real_out, real_err = _sys.stdout, _sys.stderr
+    try:
+        _sys.stdout = None
+        _sys.stderr = io.StringIO()
+        app_logging.install_streams()
+        assert _sys.stdout is not None, "None 的 stdout 没被补上"
+        assert isinstance(_sys.stderr, io.StringIO), "好的 stderr 被无谓替换了"
+    finally:
+        _sys.stdout, _sys.stderr = real_out, real_err
+
+
+def test_uvicorn_can_configure_logging_without_a_console(app_logging):
+    """真正的回归测试：uvicorn 能在无标准流的环境下配置日志。
+
+    这一条直接复现原始故障——把 stdout/stderr 置 None，然后让 uvicorn
+    构建它的 Config（`configure_logging()` 就在 `__init__` 里跑）。
+    没有补标准流的话，这里会抛
+    `AttributeError: 'NoneType' object has no attribute 'isatty'`。
+    """
+    import sys as _sys
+
+    try:
+        import uvicorn  # noqa: F401
+    except ImportError:
+        pytest.skip("没装 uvicorn")
+
+    real_out, real_err = _sys.stdout, _sys.stderr
+    try:
+        _sys.stdout = None
+        _sys.stderr = None
+        app_logging.install_streams()
+        # Config 的构造函数里就会调 configure_logging
+        cfg = uvicorn.Config(lambda: None, log_level="warning")
+        assert cfg.log_level == "warning"
+    finally:
+        _sys.stdout, _sys.stderr = real_out, real_err
+
+
+def test_main_fills_streams_before_starting_the_service():
+    """启动顺序：补标准流必须发生在起 uvicorn **之前**。
+
+    上一条测试自己调了 `install_streams()`，所以它证明的是"这个方法有用"，
+    证明不了"启动流程真的会调它"——把 main.py 里那行删掉，它照样通过。
+    （变异验证抓到了这一点。）
+
+    顺序也不能反：uvicorn 在后台线程里起的，`Config.__init__` 里就会读
+    `sys.stdout`。先起服务再补流，那一下照样崩。
+    """
+    import ast
+
+    tree = ast.parse((_ROOT / "app" / "main.py").read_text(encoding="utf-8"))
+    main_fn = next(
+        (n for n in ast.walk(tree)
+         if isinstance(n, ast.FunctionDef) and n.name == "main"),
+        None,
+    )
+    assert main_fn is not None, "main.py 里找不到 main()"
+
+    def _line_of(pred) -> int | None:
+        for node in ast.walk(main_fn):
+            if pred(node):
+                return node.lineno
+        return None
+
+    streams_at = _line_of(
+        lambda n: isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "install_streams"
+    )
+    thread_at = _line_of(
+        lambda n: isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "Thread"
+    )
+
+    assert streams_at is not None, (
+        "main() 里没有调用 install_streams()——无控制台时 uvicorn 会因为 "
+        "sys.stdout 是 None 而崩在 isatty() 上"
+    )
+    assert thread_at is not None, "main() 里没找到起服务线程的地方"
+    assert streams_at < thread_at, (
+        f"install_streams() 在第 {streams_at} 行，而起服务在第 {thread_at} 行——"
+        "补标准流必须在前，否则 uvicorn 配置日志时就已经崩了"
+    )
+
+
+def test_log_stream_does_not_recurse_when_the_log_file_fails(app_logging):
+    """日志写不进去时也不能崩，更不能递归。
+
+    `_LogStream.write` 调 `log()`，而 `log()` 失败时若往 stderr 写，就会再进
+    `_LogStream.write`——无限递归。所以 `log()` 必须自己吞掉所有异常。
+    """
+    stream = app_logging._LogStream("test")
+    # 写一个空串和一个纯空白串：不该产生日志行，也不该抛
+    assert stream.write("") == 0
+    assert stream.write("   \n") == 4

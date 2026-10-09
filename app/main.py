@@ -8,6 +8,17 @@ r"""桌面应用入口：起本地服务 → 开原生窗口。
 **为什么先起服务再开窗。** 窗口一打开就会去请求 `/api/...`，服务没起来的话
 页面会闪一下"连接失败"再自己好——那种闪烁让人怀疑软件是不是有问题。
 先把端口听上，再开窗，页面第一次加载就是完整的。
+
+**为什么全程写日志文件。** 打包后没有控制台，`sys.stdout`/`sys.stderr` 都是
+`None`。这意味着任何失败都是**静默**的：双击没反应，看不出卡在哪。
+
+实测踩到过：uvicorn 在后台线程里起不来，而 `sys.excepthook` 不抓非主线程异常，
+主线程那句 `print(..., file=sys.stderr)` 又因为 stderr 是 None 自己先崩了——
+两个洞叠在一起，整个启动过程没有任何线索。所以这里：
+
+  - 所有诊断走 `logging_setup.log()`（只写文件，不碰标准流）
+  - 同时装主线程与后台线程的异常钩子
+  - 每个阶段都记一行，失败时能直接看出走到哪一步
 """
 
 from __future__ import annotations
@@ -16,15 +27,17 @@ import socket
 import sys
 import threading
 import time
-import traceback
 
 if __package__ in (None, ""):
     # 直接 `python app/main.py` 跑的时候，app/ 自己在 sys.path 里，
     # 但项目根不在——而 server.py 要用 `import paths` 这种同目录导入。
     import pathlib
 
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+    _APP_DIR = pathlib.Path(__file__).resolve().parent
+    sys.path.insert(0, str(_APP_DIR))
+    sys.path.insert(0, str(_APP_DIR.parent))
+
+import logging_setup  # noqa: E402
 
 
 def _free_port() -> int:
@@ -40,14 +53,25 @@ def _free_port() -> int:
 
 
 def _serve(port: int) -> None:
-    import uvicorn
+    """在后台线程里跑本地服务。
 
-    from server import app
+    **必须接住异常**。这个函数跑在后台线程里，而 `sys.excepthook` 不管非主线程——
+    原本 uvicorn 在这里起不来时，异常直接消失，主线程那边只会看到"等不到端口"
+    然后自己也崩在写 stderr 上。
+    """
+    try:
+        import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", access_log=False)
+        from server import app
+
+        logging_setup.log(f"uvicorn 启动中… host=127.0.0.1 port={port}")
+        uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", access_log=False)
+        logging_setup.log("uvicorn 退出（serve 返回）")
+    except BaseException as exc:  # noqa: BLE001 - 后台线程的任何异常都要留下痕迹
+        logging_setup.log_exception("uvicorn 启动失败：", exc)
 
 
-def _wait_ready(port: int, timeout: float = 20.0) -> bool:
+def _wait_ready(port: int, timeout: float = 25.0) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -58,63 +82,71 @@ def _wait_ready(port: int, timeout: float = 20.0) -> bool:
     return False
 
 
-def _install_excepthook() -> None:
-    """未捕获异常写进一个日志文件。
-
-    打包成 `--windowed` 之后**没有控制台**，异常会静默消失——软件双击没反应，
-    而用户拿不到任何线索。所以兜底写到文件里，让它至少是可查的。
-    """
-
-    def hook(exc_type, exc_value, exc_tb) -> None:
-        try:
-            import paths
-
-            log = paths.config_file().parent / "error.log"
-            log.parent.mkdir(parents=True, exist_ok=True)
-            with log.open("a", encoding="utf-8") as fh:
-                fh.write(f"\n{'=' * 60}\n{time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                traceback.print_exception(exc_type, exc_value, exc_tb, file=fh)
-        except Exception:  # noqa: BLE001
-            pass
-        sys.__excepthook__(exc_type, exc_value, exc_tb)
-
-    sys.excepthook = hook
-
-
 def main() -> int:
-    _install_excepthook()
+    logging_setup.rotate_if_large()
+    # 顺序要紧：先把标准流补上，再装异常钩子。
+    # 没有控制台的进程里 sys.stdout/stderr 是 None，而 uvicorn 这类库会直接
+    # 调 `sys.stdout.isatty()`——实测就是它在打包后把启动整个搞崩的。
+    logging_setup.install_streams()
+    logging_setup.install()
+    logging_setup.log("=" * 50)
+    logging_setup.log(f"启动；frozen={getattr(sys, 'frozen', False)} "
+                      f"stdout={'None' if sys.stdout is None else 'ok'} "
+                      f"stderr={'None' if sys.stderr is None else 'ok'}")
 
-    import paths
+    try:
+        import paths
+    except BaseException as exc:  # noqa: BLE001
+        logging_setup.log_exception("导入 paths 失败：", exc)
+        return 1
 
-    project = paths.resolve_project()
+    try:
+        project = paths.resolve_project()
+    except BaseException as exc:  # noqa: BLE001
+        logging_setup.log_exception("解析项目目录失败：", exc)
+        project = None
+    logging_setup.log(f"项目目录：{project}")
+
     port = _free_port()
+    logging_setup.log(f"选中端口：{port}")
 
-    threading.Thread(target=_serve, args=(port,), daemon=True).start()
+    threading.Thread(target=_serve, args=(port,), daemon=True, name="uvicorn").start()
+
     if not _wait_ready(port):
-        print("本地服务启动失败", file=sys.stderr)
+        logging_setup.log("本地服务未在 25 秒内就绪，放弃启动窗口")
+        # 不写 stderr：没有控制台时它是 None，写了会再抛一次，
+        # 把真正的失败原因盖掉。日志文件里已经有完整记录了。
+        return 1
+    logging_setup.log("本地服务已就绪")
+
+    try:
+        import webview
+    except BaseException as exc:  # noqa: BLE001
+        logging_setup.log_exception("导入 pywebview 失败（WebView2 运行时是否可用？）：", exc)
         return 1
 
     url = f"http://127.0.0.1:{port}"
-
-    import webview
-
-    webview.create_window(
-        "GovFin 决策工作台",
-        url,
-        width=1440,
-        height=920,
-        min_size=(1080, 700),
-        background_color="#0a0e1a",
-        text_select=True,
-    )
-
-    if project is None:
-        # 找不到项目不拦着开窗：决策可视化在服务已部署的情况下照常能用，
-        # 只是"部署"页会给引导。拦下来会让人以为软件坏了。
-        print(f"提示：没找到 govfin 项目目录，部署功能需要先在界面里选择目录", file=sys.stderr)
-
-    webview.start()
-    return 0
+    try:
+        webview.create_window(
+            "GovFin 决策工作台",
+            url,
+            width=1440,
+            height=920,
+            min_size=(1080, 700),
+            background_color="#0a0e1a",
+            text_select=True,
+        )
+        logging_setup.log(f"窗口已创建 → {url}")
+        if project is None:
+            # 找不到项目不拦着开窗：决策可视化在服务已部署的情况下照常能用，
+            # 只是"部署"页会给引导。拦下来会让人以为软件坏了。
+            logging_setup.log("提示：未找到项目目录，部署功能需要先在界面里选择")
+        webview.start()
+        logging_setup.log("窗口关闭，正常退出")
+        return 0
+    except BaseException as exc:  # noqa: BLE001
+        logging_setup.log_exception("窗口启动失败：", exc)
+        return 1
 
 
 if __name__ == "__main__":

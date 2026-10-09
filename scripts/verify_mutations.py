@@ -196,6 +196,31 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "            return\n",
         "tests/test_desktop_app.py::test_root_route_serves_the_desktop_page",
     ),
+    (
+        "不补标准流（无控制台时 uvicorn 直接崩）",
+        "app/main.py",
+        "    logging_setup.install_streams()\n",
+        "    pass\n",
+        "tests/test_desktop_app.py::test_main_fills_streams_before_starting_the_service",
+    ),
+    (
+        "日志流不实现 isatty（uvicorn 上色判断失败）",
+        "app/logging_setup.py",
+        "    def isatty(self) -> bool:\n        return False\n\n",
+        "",
+        "tests/test_desktop_app.py::test_log_stream_survives_the_calls_libraries_actually_make",
+    ),
+    (
+        "补标准流时把好的也一起替换",
+        "app/logging_setup.py",
+        "    if sys.stdout is None:\n"
+        "        sys.stdout = _LogStream(\"stdout\")\n"
+        "    if sys.stderr is None:\n"
+        "        sys.stderr = _LogStream(\"stderr\")\n",
+        "    sys.stdout = _LogStream(\"stdout\")\n"
+        "    sys.stderr = _LogStream(\"stderr\")\n",
+        "tests/test_desktop_app.py::test_install_streams_fills_only_missing_ones",
+    ),
 ]
 
 
