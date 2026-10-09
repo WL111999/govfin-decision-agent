@@ -113,3 +113,127 @@ def test_frontend_check_rejects_dangling_root_id(bundle_script):
     payload["agent_id"] = 99
     problems = bundle_script.ui_would_accept(payload)
     assert any("agent_id" in p for p in problems), f"悬空的顶层 id 没被拦下：{problems}"
+
+
+# --------------------------------------------------------------------------
+# 提示词里的调用格式约束
+#
+# 实测踩到的坑：模型第一轮正确写了 `<code>` 块，第二轮改用 DeepSeek 的原生工具调用
+# 标记（`<｜｜DSML｜｜ calls>`），而 Nexent 只认 `<code>`——那串标记没被解析，直接
+# 成了"最终答案"显示给用户。整轮流程就此中断，用户看到的是一堆乱码标记。
+#
+# 提示词在这个系统里**就是接口**：模型怎么写工具调用，完全由它决定。所以约束它
+# 和约束代码一样重要——而且更容易被无意改掉（改提示词不会让任何代码测试变红）。
+# --------------------------------------------------------------------------
+
+
+def _complete_code_blocks(text: str) -> list[str]:
+    """取出所有**完整**的 `<code>…</code>` 块的内容。
+
+    两个坑，都踩过：
+
+    1. 不能只数 `<code>` 出现几次——那样"有开标签没闭标签"也算数，而模型拿到
+       半截标记只会更困惑。这里配对取整块。
+    2. **要跳过反引号里的 `` `<code>` ``**。提示词正文里提到这个标记时会把它写成
+       行内代码（带反引号），朴素查找会把它当成真的开标签，然后和后面真正的
+       `</code>` 配成一对，把中间一大段正文都当成"代码块"剥掉。
+    """
+    blocks: list[str] = []
+    cursor = 0
+    while True:
+        start = text.find("<code>", cursor)
+        if start < 0:
+            break
+        # 前面紧跟反引号的是行内提及，不是真的代码块
+        if start > 0 and text[start - 1] == "`":
+            cursor = start + len("<code>")
+            continue
+        end = text.find("</code>", start)
+        if end < 0:
+            break
+        blocks.append(text[start + len("<code>") : end])
+        cursor = end + len("</code>")
+    return blocks
+
+
+def test_constraint_prompt_mandates_code_block_calls(bundle_script):
+    """必须**明确要求**用 `<code>` 块，给出完整示例，并点名禁止标记式调用。
+
+    三条缺一不可，而且前两条容易混为一谈：
+
+    - **示例**告诉模型"长这样"；
+    - **明确要求**告诉模型"你必须这样"。
+
+    只有示例没有要求时，模型把它当成"众多写法之一"，遇到别的格式诱惑
+    （比如它自己原生的工具调用标记）就可能换过去——这正是实测发生的事。
+    所以这里把示例块从正文里剥掉之后，还要再查一遍正文里有没有这条要求。
+    """
+    prompt = bundle_script.CONSTRAINT_PROMPT
+
+    blocks = _complete_code_blocks(prompt)
+    assert blocks, "约束提示词里没有完整的 <code>…</code> 示例块"
+
+    callable_blocks = [b for b in blocks if "(" in b and "print(" in b]
+    assert callable_blocks, (
+        "约束提示词里的代码块没有给出'调用工具并 print'的完整示例——"
+        "模型只能自己猜调用格式，而它猜错过"
+    )
+
+    # 把示例块剥掉，剩下的才是"要求"部分
+    prose = prompt
+    for block in blocks:
+        prose = prose.replace(f"<code>{block}</code>", "")
+
+    # 只查"正文里出现过 <code>"是不够的——正文里可能只是在**描述历史**
+    # （"模型先正确写了一轮 <code>…"），那不是在提要求。所以要求：
+    # 至少有一行同时含 <code> 和祈使词，也就是一条真正的指令。
+    mandates = [
+        line for line in prose.splitlines()
+        if "<code>" in line and any(w in line for w in ("必须", "务必", "应当", "要求", "只能"))
+    ]
+    assert mandates, (
+        "正文里没有一条明确要求使用 <code> 块的指令——只有示例和描述时，"
+        "模型会把它当成可选的写法之一，遇到自己熟悉的其他格式就可能换过去"
+    )
+
+    for marker in ("DSML", "tool_call"):
+        assert marker in prompt, (
+            f"约束提示词没有点名禁止 {marker} 式的工具调用标记——"
+            "模型会退回到它的原生格式，而那串标记不会被解析"
+        )
+
+
+def test_few_shots_show_real_code_blocks(bundle_script):
+    """示例里要给出**多处**可直接照抄的 `<code>` 块。
+
+    few-shots 是模型模仿的对象。只给"结论长这样"而不给"怎么调用工具"，
+    模型在调用格式上就只能靠自己猜——而它猜错过。
+
+    这里要求至少 4 个**完整**块（真实调用序列分四轮：核验 / 采集 / 推理决策 /
+    取依据），而不是数 `<code>` 字符串出现几次。
+    """
+    shots = bundle_script.FEW_SHOTS_PROMPT
+    blocks = _complete_code_blocks(shots)
+    assert len(blocks) >= 4, (
+        f"few-shots 里完整的 <code> 块只有 {len(blocks)} 个，"
+        "覆盖不了真实调用序列；模型会自己补格式"
+    )
+
+    callable_blocks = [b for b in blocks if "print(" in b]
+    assert callable_blocks, "示例里没有 print，模型可能以为返回值会自动可见"
+
+    tool_named = [b for b in blocks if "gov_" in b or "risk_decision" in b]
+    assert tool_named, "示例里的代码块没有调用任何真实工具"
+
+
+def test_duty_prompt_avoids_parallel_executor(bundle_script):
+    """提示词不该引导模型去用执行器工具。
+
+    `parallel_executor` 的参数是嵌套结构，模型写错过一次就整轮中断，
+    而这几个工具都很快、顺序调用完全够用——收益远小于风险。
+    """
+    prompt = bundle_script.CONSTRAINT_PROMPT + bundle_script.DUTY_PROMPT
+    assert "parallel_executor" in prompt, (
+        "没有显式劝阻 parallel_executor；模型会自己想到它（它确实在工具列表里）"
+    )
+    assert "不要用" in prompt or "顺序调用" in prompt, "劝阻的措辞不够明确"

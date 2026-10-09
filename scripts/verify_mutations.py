@@ -127,6 +127,27 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "PLACEHOLDER_AGENT_ID = 0\n",
         "tests/test_nexent_bundle.py::test_placeholder_agent_id_is_truthy",
     ),
+    (
+        "约束提示词不再要求 <code> 块",
+        "scripts/build_nexent_bundle.py",
+        "调用工具**必须写成 Python 代码，放在 `<code>` 块里**：\n",
+        "调用工具时请按规范格式书写。\n",
+        "tests/test_nexent_bundle.py::test_constraint_prompt_mandates_code_block_calls",
+    ),
+    (
+        "约束提示词不再点名禁止 DSML 标记",
+        "scripts/build_nexent_bundle.py",
+        "**绝对不要**输出工具调用标记——不要 `DSML`、不要 `<tool_call>`、不要 JSON 形式的\n",
+        "",
+        "tests/test_nexent_bundle.py::test_constraint_prompt_mandates_code_block_calls",
+    ),
+    (
+        "few-shots 不再给可照抄的调用示例",
+        "scripts/build_nexent_bundle.py",
+        "## 第一轮：核验真实性\n\n<code>\n",
+        "## 第一轮：核验真实性\n\n",
+        "tests/test_nexent_bundle.py::test_few_shots_show_real_code_blocks",
+    ),
 ]
 
 
