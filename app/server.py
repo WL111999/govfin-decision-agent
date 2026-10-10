@@ -266,6 +266,43 @@ def api_deploy_start(req: DeployRequest) -> dict:
     return job.snapshot()
 
 
+class StopRequest(BaseModel):
+    stop_docker: bool = False
+
+
+@app.post("/api/services/stop")
+def api_services_stop(req: StopRequest) -> dict:
+    """一键关闭。默认**只停 GovFin 的三个容器，不动 Docker 引擎。**
+
+    停 Docker 会连带停掉它下面的所有容器——包括 Nexent 那一整套（12 个）。
+    用户点"关闭 GovFin"时多半没打算把 Nexent 也关掉，而那个后果要等
+    下次用 Nexent 时才发现。所以那一步得显式选。
+    """
+    project = _require_project()
+    job = deploy_mod.stop_services(project, stop_docker=req.stop_docker)
+    return job.snapshot()
+
+
+@app.get("/api/services/state")
+def api_services_state() -> dict:
+    """当前这套服务的真实状态（不依赖有没有正在跑的任务）。
+
+    和任务状态分开：任务状态说的是"这次操作进行到哪了"，
+    这个是"现在到底什么情况"。界面初始化时要的是后者。
+    """
+    snapshot = deploy_mod.status_snapshot(paths.resolve_project())
+    services = {
+        c["name"]: ("running" if c["state"] == "running" else "stopped")
+        for c in snapshot.get("containers", [])
+    }
+    return {
+        "docker": "ready" if snapshot["docker"]["ok"] else "stopped",
+        "docker_detail": snapshot["docker"]["detail"],
+        "network": snapshot.get("network", False),
+        "services": services,
+    }
+
+
 @app.post("/api/services/start")
 def api_services_start() -> dict:
     """一键启动：把 Docker 和容器拉起来。**不构建镜像。**

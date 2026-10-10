@@ -583,3 +583,73 @@ def test_services_start_route_is_registered(app_server):
     paths = {r.path for r in app_server.app.routes if isinstance(r, APIRoute)}
     assert "/api/services/start" in paths
     assert "/api/deploy/start" in paths, "部署入口被误删了"
+
+
+def test_stop_services_defaults_to_not_touching_docker(app_deploy):
+    """关闭的默认行为是**只停 GovFin 的容器，不动 Docker 引擎**。
+
+    这不是谨慎，是必需的默认值：停 Docker 会连带停掉它下面的**所有**容器——
+    包括 Nexent 那一整套（12 个）。用户点"关闭 GovFin"时多半没打算把 Nexent
+    也关掉，而那个后果要等下次用 Nexent 时才发现，中间隔了很久、离原因很远。
+    """
+    import inspect
+
+    sig = inspect.signature(app_deploy.stop_services)
+    assert "stop_docker" in sig.parameters, "stop_services 没有停引擎的开关"
+    assert sig.parameters["stop_docker"].default is False, (
+        "stop_docker 的默认值必须是 False —— 默认把别人的服务一起停掉是不可接受的"
+    )
+
+
+def test_stop_services_route_is_registered(app_server):
+    from fastapi.routing import APIRoute
+
+    paths = {r.path for r in app_server.app.routes if isinstance(r, APIRoute)}
+    assert "/api/services/stop" in paths
+    assert "/api/services/state" in paths, "缺了状态查询路由"
+
+
+def test_service_state_reports_every_container(app_server):
+    """状态查询要覆盖全部容器，不能漏。
+
+    漏掉一个的后果：界面上那个节点永远是灰的，而它其实在跑——
+    用户会去点启动，然后什么也没发生。
+    """
+    import inspect
+
+    src = inspect.getsource(app_server.api_services_state)
+    assert "CONTAINERS" in src or "containers" in src, "状态查询没有遍历容器"
+    assert "services" in src, "没有返回 services 字段（前端靠它画节点）"
+
+
+def test_job_tracks_structured_state_not_just_text(app_deploy):
+    """任务要维护结构化状态，而不只是文本日志。
+
+    界面要靠它画拓扑：**日志是给人读的，状态是给界面画的**。
+    让界面去 grep 日志的话，每次改提示文案都可能悄悄弄坏画面——
+    而那种失效不会有任何测试变红。
+    """
+    job = app_deploy.DeployJob(_ROOT)
+    assert hasattr(job, "services") and hasattr(job, "phase")
+    snap = job.snapshot()
+    for key in ("phase", "docker", "services", "action"):
+        assert key in snap, f"snapshot 里缺 {key}，界面画不出拓扑"
+
+    # 每个容器都要有初始状态，否则前端会少画一个节点
+    assert set(snap["services"]) == set(app_deploy.CONTAINERS), (
+        "services 里的键与 CONTAINERS 对不上，会有节点画不出来"
+    )
+    assert all(v == "pending" for v in snap["services"].values())
+
+
+def test_set_phase_does_not_write_a_log_line(app_deploy):
+    """`set_phase` 不该写日志 —— 否则同一句话会出现两遍。
+
+    实测踩到过：日志里"检查 Docker"连着出现两次，看起来像执行了两轮。
+    message 是给界面显示的状态行，日志由调用处自己写。
+    """
+    job = app_deploy.DeployJob(_ROOT)
+    before = len(job.lines)
+    job.set_phase("docker", "检查 Docker")
+    assert len(job.lines) == before, "set_phase 往日志里写了东西"
+    assert job.snapshot()["message"] == "检查 Docker", "message 没被记下来"

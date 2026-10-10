@@ -205,24 +205,58 @@ def launch_docker_desktop() -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 
 
+# 每个服务的可视化状态。前端拿它画拓扑，不解析日志文本。
+#
+# 为什么要有这个（而不是让前端去 grep 日志）：日志是给人读的，措辞会变；
+# 而"这个服务现在是什么状态"是个**结构化事实**，让它随日志措辞漂移，
+# 等于每次改提示文案都可能悄悄弄坏画面。
+SERVICE_STATES = (
+    "pending",     # 还没轮到它
+    "starting",    # 正在起
+    "running",     # 已在跑
+    "stopping",    # 正在停
+    "stopped",     # 已停止
+    "failed",      # 出错了
+)
+
+
 class DeployJob:
-    """一次部署的执行记录。
+    """一次部署/启动/停止的执行记录。
 
     日志用 list + 只增不减的偏移量。前端带着 offset 来问"有没有新的"，
     这样重连、刷新页面、开两个窗口都不会丢行或者重复行。
+
+    除了日志，还维护一份**结构化状态**（phase + 每个服务的状态）——
+    日志是给人读的，状态是给界面画的，两者的消费者不同，
+    混在一起会让改文案变成一次有风险的改动。
     """
 
-    def __init__(self, project: pathlib.Path, *, rebuild: bool = False, skip_nexent: bool = False) -> None:
+    def __init__(
+        self,
+        project: pathlib.Path,
+        *,
+        rebuild: bool = False,
+        skip_nexent: bool = False,
+        action: str = "deploy",
+    ) -> None:
         self.id = uuid.uuid4().hex[:12]
         self.project = pathlib.Path(project)
         self.rebuild = rebuild
         self.skip_nexent = skip_nexent
+        self.action = action          # deploy / start / stop
         self.lines: list[str] = []
         self.done = False
         self.ok = False
         self.started_at = time.time()
         self.finished_at: float | None = None
         self._lock = threading.Lock()
+        # 可视化状态
+        self.phase: str = "init"      # init/docker/images/containers/wait/done/failed
+        self.docker_state: str = "unknown"   # unknown/starting/ready
+        self.services: dict[str, str] = {name: "pending" for name in CONTAINERS}
+        self.message: str = ""
+
+    # -- 日志 ---------------------------------------------------------------
 
     def log(self, message: str = "") -> None:
         with self._lock:
@@ -237,6 +271,30 @@ class DeployJob:
         for line in (text or "").splitlines():
             self.log(f"    {line}")
 
+    # -- 状态 ---------------------------------------------------------------
+
+    def set_phase(self, phase: str, message: str = "") -> None:
+        """更新阶段与那句"现在在干什么"。
+
+        **不写日志**。message 是给界面显示的状态行，日志由调用处自己 `log`——
+        两边都写的话同一句话会在日志里出现两遍（实测踩过），
+        而重复的日志会让人怀疑是不是执行了两次。
+        """
+        with self._lock:
+            self.phase = phase
+            if message:
+                self.message = message
+
+    def set_service(self, name: str, state: str) -> None:
+        if state not in SERVICE_STATES:
+            state = "pending"
+        with self._lock:
+            self.services[name] = state
+
+    def set_docker(self, state: str) -> None:
+        with self._lock:
+            self.docker_state = state
+
     def since(self, offset: int) -> tuple[list[str], int]:
         with self._lock:
             total = len(self.lines)
@@ -246,14 +304,35 @@ class DeployJob:
 
     def snapshot(self) -> dict:
         elapsed = (self.finished_at or time.time()) - self.started_at
-        return {
-            "job_id": self.id,
-            "running": not self.done,
-            "done": self.done,
-            "ok": self.ok,
-            "elapsed_seconds": round(elapsed, 1),
-            "line_count": len(self.lines),
-        }
+        with self._lock:
+            return {
+                "job_id": self.id,
+                "action": self.action,
+                "running": not self.done,
+                "done": self.done,
+                "ok": self.ok,
+                "elapsed_seconds": round(elapsed, 1),
+                "line_count": len(self.lines),
+                # 可视化用
+                "phase": self.phase,
+                "docker": self.docker_state,
+                "services": dict(self.services),
+                "message": self.message,
+            }
+
+    def state_view(self) -> dict:
+        """只要可视化那部分，不带日志（省流量，前端轮询频繁）。"""
+        with self._lock:
+            return {
+                "job_id": self.id,
+                "action": self.action,
+                "done": self.done,
+                "ok": self.ok,
+                "phase": self.phase,
+                "docker": self.docker_state,
+                "services": dict(self.services),
+                "message": self.message,
+            }
 
 
 _JOBS: dict[str, DeployJob] = {}
@@ -355,27 +434,34 @@ def _start_only(job: DeployJob) -> bool:
     project = job.project
 
     # --- Docker ---
+    job.set_phase("docker", "检查 Docker")
     job.log("检查 Docker")
     ok, detail = docker_running()
     if ok:
+        job.set_docker("ready")
         job.log(f"  ✓ 引擎在跑（{detail}）")
     else:
+        job.set_docker("starting")
         job.log("  · 引擎没在跑，正在拉起 Docker Desktop…")
         launched, message = launch_docker_desktop()
         job.log(f"    {message}")
         if not launched:
             return False
         if not _wait_for_docker(job):
+            job.set_docker("failed")
             return False
+        job.set_docker("ready")
 
     docker = find_docker()
     if not docker:
         job.log("✗ 找不到 docker 命令，请先安装 Docker Desktop")
+        job.set_phase("failed")
         return False
 
     # --- 镜像 ---
     # 没有镜像就**停下来**，不要在这里悄悄构建：那是几分钟的事，
     # 而用户点的是"启动"，期待的是几十秒。让他明确去点"部署"更诚实。
+    job.set_phase("images", "检查镜像")
     missing = [spec["image"] for spec in CONTAINERS.values() if not image_exists(spec["image"])]
     if missing:
         job.log("")
@@ -385,15 +471,18 @@ def _start_only(job: DeployJob) -> bool:
         job.log("")
         job.log("  去「部署与配置」页点『开始部署』——那一步会构建镜像（几分钟）。")
         job.log("  以后开机只需要点『一键启动』，不用再构建。")
+        job.set_phase("failed")
         return False
     job.log("")
     job.log(f"镜像就绪（{len(CONTAINERS)} 个）")
 
     # --- 容器 ---
+    job.set_phase("containers", "启动容器")
     job.log("")
     job.log("启动容器")
     console_env = _console_env_args(project)
     for name, spec in CONTAINERS.items():
+        job.set_service(name, "starting")
         state = container_state(name)
         if state == "running":
             job.log(f"  ↺ {name} 已在运行")
@@ -413,6 +502,8 @@ def _start_only(job: DeployJob) -> bool:
             r = run(cmd + [spec["image"]], timeout=300)
             if r.returncode != 0:
                 job.log(f"  ✗ 启动 {name} 失败：{(r.stderr or r.stdout or '')[:300]}")
+                job.set_service(name, "failed")
+                job.set_phase("failed")
                 return False
             job.log(f"  + {name} 已启动")
 
@@ -420,8 +511,10 @@ def _start_only(job: DeployJob) -> bool:
             r = run([docker, "network", "connect", "--alias", spec["alias"], NEXENT_NETWORK, name], timeout=60)
             if r.returncode == 0:
                 job.log(f"    已接入 {NEXENT_NETWORK}")
+        job.set_service(name, "running")
 
     # --- 等就绪 ---
+    job.set_phase("wait", "等待服务就绪")
     job.log("")
     job.log("等待服务就绪 …")
     for _ in range(20):
@@ -434,9 +527,101 @@ def _start_only(job: DeployJob) -> bool:
         job.log("  ! 决策服务还没到 healthy；可能只是慢，也可能起不来")
         job.log("    详细状态看「服务状态」页")
 
+    job.set_phase("done", "服务已就绪")
     job.log("")
     job.log("控制台    http://localhost:8090")
     job.log("Nexent    http://localhost:3000")
+    return True
+
+
+def stop_services(project: pathlib.Path, *, stop_docker: bool = False) -> DeployJob:
+    """一键关闭：停容器，可选连 Docker 一起停。
+
+    **默认不停 Docker。** 这是个刻意的默认值：停掉 Docker 会连带停掉它下面的
+    **所有**容器——包括 Nexent 那一整套（12 个）。用户点"关闭 GovFin"时多半
+    没打算把 Nexent 也关掉，而那个后果要等下次用 Nexent 时才发现。
+
+    真要停 Docker 得显式说。
+    """
+    job = DeployJob(project, action="stop")
+    job.stop_docker = stop_docker
+    with _JOBS_LOCK:
+        _JOBS[job.id] = job
+        for stale in list(_JOBS)[:-5]:
+            _JOBS.pop(stale, None)
+    threading.Thread(target=_run_stop_services, args=(job,), daemon=True).start()
+    return job
+
+
+def _run_stop_services(job: DeployJob) -> None:
+    try:
+        job.ok = _stop_only(job)
+    except Exception as exc:  # noqa: BLE001
+        job.log(f"✗ 关闭中断：{type(exc).__name__}: {exc}")
+        job.ok = False
+    finally:
+        job.done = True
+        job.finished_at = time.time()
+        job.log("")
+        job.log("已关闭。" if job.ok else "未能完全关闭，见上面的提示。")
+        if job.ok:
+            job.set_phase("done", "已关闭")
+
+
+def _stop_only(job: DeployJob) -> bool:
+    docker = find_docker()
+    if not docker:
+        job.log("✗ 找不到 docker 命令")
+        job.set_phase("failed")
+        return False
+
+    ok, detail = docker_running()
+    if not ok:
+        job.log(f"  · {detail}——没有需要停的服务")
+        for name in CONTAINERS:
+            job.set_service(name, "stopped")
+        job.set_docker("stopped")
+        job.set_phase("done", "已经全部停止")
+        return True
+
+    job.set_docker("ready")
+    job.set_phase("containers", "停止容器")
+    job.log("停止容器")
+    for name in CONTAINERS:
+        state = container_state(name)
+        if state != "running":
+            job.log(f"  · {name} 本来就没在跑")
+            job.set_service(name, "stopped")
+            continue
+        job.set_service(name, "stopping")
+        job.log(f"  · 正在停止 {name} …")
+        r = run([docker, "stop", name], timeout=120)
+        if r.returncode != 0:
+            job.log(f"  ✗ 停止 {name} 失败：{(r.stderr or r.stdout or '')[:200]}")
+            job.set_service(name, "failed")
+            job.set_phase("failed")
+            return False
+        job.set_service(name, "stopped")
+        job.log(f"  ✓ {name} 已停止")
+
+    if not getattr(job, "stop_docker", False):
+        job.log("")
+        job.log("Docker 引擎保持运行 —— 它下面还有 Nexent 那一套，")
+        job.log("停掉会连带把它们一起停了。真要停 Docker 得显式选择。")
+    else:
+        job.set_phase("docker_stop", "正在停止 Docker 引擎")
+        job.log("")
+        job.log("正在停止 Docker 引擎（它下面所有容器都会一起停）…")
+        r = run([docker, "desktop", "stop"], timeout=300)
+        if r.returncode != 0:
+            job.log(f"  ✗ 停止引擎失败：{(r.stderr or r.stdout or '')[:200]}")
+            job.set_docker("failed")
+            job.set_phase("failed")
+            return False
+        job.set_docker("stopped")
+        job.log("  ✓ 引擎已停止")
+
+    job.set_phase("done", "已关闭")
     return True
 
 

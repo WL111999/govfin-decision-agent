@@ -224,18 +224,14 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
     (
         "一键启动里偷偷构建镜像",
         "app/deploy.py",
-        '    job.log("")\n'
-        '    job.log("启动容器")\n'
         '    console_env = _console_env_args(project)\n'
         '    for name, spec in CONTAINERS.items():\n'
-        '        state = container_state(name)',
+        '        job.set_service(name, "starting")\n',
         '    for _n, _s in CONTAINERS.items():\n'
         '        run([docker, "build", "-f", _s["dockerfile"], "-t", _s["image"], _s["context"]], timeout=600)\n'
-        '    job.log("")\n'
-        '    job.log("启动容器")\n'
         '    console_env = _console_env_args(project)\n'
         '    for name, spec in CONTAINERS.items():\n'
-        '        state = container_state(name)',
+        '        job.set_service(name, "starting")\n',
         "tests/test_desktop_app.py::test_start_services_never_builds_images",
     ),
     (
@@ -244,6 +240,41 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         '    missing = [spec["image"] for spec in CONTAINERS.values() if not image_exists(spec["image"])]',
         '    missing = []',
         "tests/test_desktop_app.py::test_missing_image_is_reported_not_silently_rebuilt",
+    ),
+    (
+        "关闭时默认连 Docker 一起停（连带停掉 Nexent）",
+        "app/deploy.py",
+        'def stop_services(project: pathlib.Path, *, stop_docker: bool = False) -> DeployJob:',
+        'def stop_services(project: pathlib.Path, *, stop_docker: bool = True) -> DeployJob:',
+        "tests/test_desktop_app.py::test_stop_services_defaults_to_not_touching_docker",
+    ),
+    (
+        "set_phase 又往日志里写（同一句话出现两遍）",
+        "app/deploy.py",
+        '        with self._lock:\n'
+        '            self.phase = phase\n'
+        '            if message:\n'
+        '                self.message = message\n\n'
+        '    def set_service',
+        '        with self._lock:\n'
+        '            self.phase = phase\n'
+        '            if message:\n'
+        '                self.message = message\n'
+        '                self.lines.append(message)\n\n'
+        '    def set_service',
+        "tests/test_desktop_app.py::test_set_phase_does_not_write_a_log_line",
+    ),
+    (
+        "状态快照不再带 services（界面画不出节点）",
+        "app/deploy.py",
+        '                "services": dict(self.services),\n'
+        '                "message": self.message,\n'
+        '            }\n\n'
+        '    def state_view',
+        '                "message": self.message,\n'
+        '            }\n\n'
+        '    def state_view',
+        "tests/test_desktop_app.py::test_job_tracks_structured_state_not_just_text",
     ),
 ]
 

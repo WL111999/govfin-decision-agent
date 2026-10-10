@@ -15,21 +15,29 @@
       混搭会让人以为切错了地方。要对比就靠"分析模式"里更密的动效来区分。
    =========================================================================== */
 :root{
-  --bg:#080b14; --bg-2:#0d1220;
-  --panel:#111827; --panel-2:#161d31; --panel-3:#1c2440;
-  --line:#232d48;
-  --ink:#e9eefb; --ink-2:#98a3bd; --ink-3:#5d6884;
-  --accent:#4d8dff; --accent-2:#22d3ee;
+  --bg:#05070f; --bg-2:#0a0f1e;
+  --panel:rgba(18,24,42,.72); --panel-2:rgba(24,32,54,.7); --panel-3:rgba(30,40,66,.7);
+  --line:rgba(70,90,140,.28); --line-lit:rgba(110,150,220,.42);
+  --ink:#eef2fb; --ink-2:#9aa6c2; --ink-3:#616d8c;
+  --accent:#5b93ff; --accent-2:#22d3ee; --accent-3:#a78bfa;
   --ok:#2dd4a7; --warn:#fbbf24; --bad:#ff4d6d;
-  --glow:rgba(77,141,255,.45);
-  --r:12px;
+  --glow:rgba(91,147,255,.45);
+  --r:14px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
   font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  background:var(--bg); color:var(--ink); overflow:hidden;
+  color:var(--ink); overflow:hidden;
   -webkit-font-smoothing:antialiased;
+  /* 多层径向渐变叠出景深。单一纯色背景会让所有卡片"浮"在同一个平面上，
+     层次感全靠边框撑——而边框永远画不出纵深感。 */
+  background:
+    radial-gradient(1200px 700px at 12% -10%, rgba(91,147,255,.13), transparent 60%),
+    radial-gradient(900px 600px at 92% 8%, rgba(167,139,250,.10), transparent 55%),
+    radial-gradient(800px 800px at 50% 120%, rgba(34,211,238,.07), transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
 }
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:#26314f;border-radius:5px}
@@ -64,8 +72,32 @@ main{flex:1;overflow:auto;position:relative}
 .page.on{display:block}
 
 /* ---- 通用件 ---- */
+/* 玻璃拟态卡片。三层叠加：半透明底色 + 背景模糊 + 渐变描边。
+   单独任何一层都不够：只有半透明会显脏，只有模糊会糊成一片，
+   只有描边则还是平的。 */
 .card{
-  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;margin-bottom:16px;
+  position:relative;
+  background:linear-gradient(180deg, rgba(26,34,58,.72), rgba(15,21,38,.62));
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:22px 24px;
+  margin-bottom:18px;
+  backdrop-filter:blur(16px) saturate(1.2);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.05) inset,
+    0 -1px 0 rgba(0,0,0,.25) inset,
+    0 10px 36px rgba(0,0,0,.38);
+}
+/* 渐变描边：用 mask 把中间掏空，只留 1px 的框。
+   比 `border-image` 可靠——后者在圆角上会画歪。 */
+.card::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;
+  background:linear-gradient(135deg,
+    rgba(140,175,255,.42), rgba(91,147,255,.06) 35%,
+    transparent 65%, rgba(34,211,238,.22));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  pointer-events:none;
 }
 .card h2{font-size:15px;font-weight:600;margin-bottom:4px;letter-spacing:.01em}
 .card .lead{color:var(--ink-2);font-size:13px;margin-bottom:16px}
@@ -254,6 +286,82 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
 .drop.over{border-color:var(--accent);background:rgba(77,141,255,.07)}
 .drop .big{font-size:14px;font-weight:500;margin-bottom:5px}
 .drop .sub{font-size:12px;color:var(--ink-3);line-height:1.8}
+/* ---- 服务拓扑：启停的可视化 ----
+   布局是"一电源 + 三负载"：Docker 引擎在上，三个服务在下一排。
+   这个形状不是装饰——它如实反映了依赖关系（引擎不在，谁也起不来）。 */
+.topo{position:relative;height:300px;margin:4px 0 2px;
+  background:radial-gradient(ellipse at 50% 12%, rgba(91,147,255,.09), transparent 62%);
+  border-radius:12px;overflow:hidden}
+#topoViz{position:absolute;inset:0;width:100%;height:100%}
+
+.tnode{
+  position:absolute;transform:translate(-50%,-50%);
+  min-width:128px;padding:12px 16px;border-radius:13px;text-align:center;
+  background:linear-gradient(180deg, rgba(26,34,58,.92), rgba(14,20,36,.88));
+  border:1px solid var(--line);
+  transition:.35s cubic-bezier(.4,0,.2,1);
+  backdrop-filter:blur(8px);
+  box-shadow:0 6px 22px rgba(0,0,0,.4);
+}
+.tnode .ti{font-size:19px;line-height:1;margin-bottom:7px;display:block;
+  filter:grayscale(.7) opacity(.5);transition:.35s}
+.tnode .tn{font-size:13px;font-weight:500;color:var(--ink-3);transition:.35s;white-space:nowrap}
+.tnode .ts{font-size:11px;color:var(--ink-3);margin-top:3px;min-height:14px;
+  letter-spacing:.03em;white-space:nowrap}
+
+/* 电源节点（Docker 引擎）：形状上略作区分，它是这一组的来源 */
+.tnode.power{border-radius:16px;min-width:150px;padding:14px 20px}
+.tnode.power .ti{font-size:22px}
+
+/* 四态。用"点亮"而不是"变色"：亮起来的是节点本身，
+   颜色只是它的属性。这样一眼就能看出哪几个在工作。 */
+.tnode.running{
+  border-color:rgba(45,212,167,.5);
+  box-shadow:0 0 0 1px rgba(45,212,167,.18), 0 0 30px rgba(45,212,167,.28), 0 6px 22px rgba(0,0,0,.4);
+}
+.tnode.running .ti{filter:none;opacity:1}
+.tnode.running .tn{color:var(--ink)}
+.tnode.running .ts{color:rgba(45,212,167,.85)}
+
+.tnode.starting,.tnode.stopping{
+  border-color:var(--accent);
+  animation:nodePulse 1.4s ease-in-out infinite;
+}
+.tnode.starting .ti,.tnode.stopping .ti{filter:none;opacity:1}
+.tnode.starting .tn,.tnode.stopping .tn{color:var(--ink)}
+.tnode.starting .ts{color:var(--accent-2)}
+.tnode.stopping .ts{color:var(--warn)}
+@keyframes nodePulse{
+  0%,100%{box-shadow:0 0 0 1px rgba(91,147,255,.3), 0 0 22px rgba(91,147,255,.22), 0 6px 22px rgba(0,0,0,.4)}
+  50%{box-shadow:0 0 0 1px rgba(91,147,255,.6), 0 0 42px rgba(91,147,255,.5), 0 6px 22px rgba(0,0,0,.4)}
+}
+
+.tnode.stopped{opacity:.5}
+.tnode.failed{
+  border-color:rgba(255,77,109,.55);
+  box-shadow:0 0 0 1px rgba(255,77,109,.2), 0 0 28px rgba(255,77,109,.3), 0 6px 22px rgba(0,0,0,.4);
+}
+.tnode.failed .ti{filter:none;opacity:1}
+.tnode.failed .tn{color:#ffb3c1}
+
+/* 相位指示：当前在做什么 */
+.tphase{
+  display:flex;align-items:center;gap:10px;margin-top:12px;
+  padding:10px 14px;border-radius:10px;
+  background:rgba(91,147,255,.08);border:1px solid rgba(91,147,255,.2);
+  font-size:13px;color:var(--ink-2);
+}
+.tphase .tp-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;
+  box-shadow:0 0 10px var(--accent);animation:nodePulse 1.3s ease-in-out infinite;
+}
+.tphase.idle{background:transparent;border-color:var(--line)}
+.tphase.idle .tp-dot{background:var(--ink-3);box-shadow:none;animation:none}
+.tphase.ok{background:rgba(45,212,167,.09);border-color:rgba(45,212,167,.28);color:#7fe6c6}
+.tphase.ok .tp-dot{background:var(--ok);box-shadow:0 0 10px var(--ok);animation:none}
+.tphase.bad{background:rgba(255,77,109,.09);border-color:rgba(255,77,109,.3);color:#ff98ab}
+.tphase.bad .tp-dot{background:var(--bad);box-shadow:0 0 10px var(--bad);animation:none}
+
 .hidden{display:none}
 </style>
 </head>
@@ -291,19 +399,37 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
     <!-- ================= 服务状态 ================= -->
     <section class="page" id="page-status">
       <div class="card">
-        <h2>服务状态</h2>
-        <p class="lead">四块服务有一块没起来，后面的步骤就会失败。</p>
-        <div id="statusBody"><div class="empty">正在检查…</div></div>
+        <h2>服务总览</h2>
+        <p class="lead">Docker 引擎是这一组的来源——它不在，下面的服务谁也起不来。</p>
+
+        <div class="topo" id="topo">
+          <canvas id="topoViz"></canvas>
+        </div>
+
+        <div class="tphase idle" id="tphase">
+          <span class="tp-dot"></span>
+          <span id="tphaseText">正在读取状态…</span>
+        </div>
+
         <div class="row" style="margin-top:16px">
           <button id="btnStart" onclick="startServices()">一键启动</button>
-          <button class="ghost" onclick="loadStatus(1)">重新检查</button>
+          <button id="btnStop" class="ghost" onclick="stopServices()">一键关闭</button>
+          <button class="ghost" onclick="loadStatus(1)">刷新</button>
         </div>
-        <p class="hint" style="margin-top:10px">
-          「一键启动」会拉起 Docker（如果没在跑）再启动服务，通常几十秒。
-          镜像还没构建过时会提示你去「部署与配置」页——那一步是几分钟的事，
-          不该混在这个按钮里。
+
+        <p class="hint" style="margin-top:12px">
+          <b>启动</b>会拉起 Docker（如果没在跑）再启动服务，通常几十秒；镜像没构建过时会
+          提示你去「部署与配置」页。<b>关闭</b>只停 GovFin 这三个容器，不动 Docker 引擎
+          —— 它下面还有 Nexent 那一套。
         </p>
+
         <div class="log hidden" id="startLog"></div>
+      </div>
+
+      <div class="card">
+        <h2>详细状态</h2>
+        <p class="lead">四块服务有一块没起来，后面的步骤就会失败。</p>
+        <div id="statusBody"><div class="empty">正在检查…</div></div>
       </div>
 
       <div class="card">
@@ -413,7 +539,14 @@ document.querySelectorAll('.tab').forEach(t => {
     document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
     document.querySelectorAll('.page').forEach(p =>
       p.classList.toggle('on', p.id === 'page-' + t.dataset.page));
-    if (t.dataset.page === 'status') loadStatus();
+    if (t.dataset.page === 'status') {
+      loadStatus();
+      syncServiceState();
+      // **必须在切过来之后重新量尺寸**。canvas 在页面隐藏时（display:none）
+      // 量到的宽高是 0，画上去什么也看不见——所以要等浏览器完成布局再 resize。
+      // 下一帧而不是同步调用：此刻 classList 刚改，重排还没发生。
+      requestAnimationFrame(resizeTopo);
+    }
     if (t.dataset.page === 'deploy') { loadProject(); loadKeyConfig(); refreshDeploy(); }
   };
 });
@@ -975,28 +1108,279 @@ function flash(msg) {
    七、服务状态
    =========================================================================== */
 
-/* 一键启动：Docker（必要时拉起）→ 容器 → 等就绪。
-   日志复用部署页那套轮询，因为它处理的正是同一件事：一个要跑几十秒、
-   需要边跑边报进度的后台任务。 */
-let startPoll = null;
+/* ===========================================================================
+   服务拓扑：把启停演出来
 
-async function startServices() {
-  const btn = $('#btnStart');
+   布局是"一电源 + 三负载"——Docker 引擎在上，三个服务在下。
+   这个形状不是装饰：它如实反映依赖（引擎不在，谁也起不来），
+   而拓扑图的价值恰恰在于让依赖可见。
+
+   canvas 画连线与粒子，DOM 画节点。理由和决策页一样：
+   文字要能选中（DOM），每帧都变的像素不该进 DOM（canvas）。
+   =========================================================================== */
+
+const TOPO_POS = {
+  docker:             [50, 17],
+  'govfin-agent':     [20, 76],
+  'govfin-embedding': [50, 76],
+  'govfin-console':   [80, 76],
+};
+const TOPO_META = {
+  docker:             { icon: '⬢', name: 'Docker 引擎', power: true },
+  'govfin-agent':     { icon: '⚡', name: '决策服务' },
+  'govfin-embedding': { icon: '◈', name: '向量化服务' },
+  'govfin-console':   { icon: '▤', name: '网页控制台' },
+};
+const TOPO_LABEL = {
+  pending: '待启动', starting: '启动中', running: '运行中',
+  stopping: '停止中', stopped: '已停止', failed: '失败',
+  ready: '就绪', unknown: '未知',
+};
+
+const topo = { cv: null, ctx: null, w: 0, h: 0, dpr: 1, t: 0,
+               nodes: {}, particles: [], bursts: [] };
+
+function initTopo() {
+  const box = $('#topo');
+  if (!box) return;
+  topo.cv = $('#topoViz');
+  topo.ctx = topo.cv.getContext('2d');
+
+  // 建节点
+  for (const [id, [px, py]] of Object.entries(TOPO_POS)) {
+    const meta = TOPO_META[id] || { icon: '●', name: id };
+    const el = document.createElement('div');
+    el.className = 'tnode stopped' + (meta.power ? ' power' : '');
+    el.id = 'tn-' + id;
+    el.style.left = px + '%';
+    el.style.top = py + '%';
+    el.innerHTML = `<span class="ti">${meta.icon}</span>
+      <span class="tn">${meta.name}</span>
+      <span class="ts">—</span>`;
+    box.appendChild(el);
+  }
+
+  resizeTopo();
+  // **用 ResizeObserver 而不是 window resize。**
+  //
+  // 这个容器会因为**切 tab** 而改变尺寸，而那不是 window 事件——隐藏时
+  // `display:none` 让它量到 0×0，切回来才有真实尺寸。只监听 window 的话，
+  // 第一次切到这一页时 canvas 是空的（实测踩到：canvas 宽高都是 0，
+  // 画上去什么也看不见）。
+  //
+  // 监听容器本身就不关心"为什么变"，只要变了就重新量——这比在每处切换代码里
+  // 手动补一次 resize 可靠得多，也不会因为将来多一个入口就漏掉。
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => resizeTopo()).observe($('#topo'));
+  }
+  window.addEventListener('resize', resizeTopo);   // 老浏览器兜底
+  requestAnimationFrame(topoTick);
+}
+
+function resizeTopo() {
+  const box = $('#topo');
+  if (!box || !topo.cv) return;
+  const r = box.getBoundingClientRect();
+  topo.dpr = window.devicePixelRatio || 1;
+  topo.w = r.width; topo.h = r.height;
+  topo.cv.width = topo.w * topo.dpr;
+  topo.cv.height = topo.h * topo.dpr;
+  topo.ctx.setTransform(topo.dpr, 0, 0, topo.dpr, 0, 0);
+  for (const [id, [px, py]] of Object.entries(TOPO_POS)) {
+    topo.nodes[id] = { x: topo.w * px / 100, y: topo.h * py / 100 };
+  }
+}
+
+function topoStateOf(id) {
+  const el = document.getElementById('tn-' + id);
+  if (!el) return 'unknown';
+  for (const s of ['running', 'starting', 'stopping', 'stopped', 'failed']) {
+    if (el.classList.contains(s)) return s;
+  }
+  return 'unknown';
+}
+
+function setNodeState(id, state) {
+  const el = document.getElementById('tn-' + id);
+  if (!el) return;
+  const before = topoStateOf(id);
+  el.classList.remove('running', 'starting', 'stopping', 'stopped', 'failed');
+  el.classList.add(state);
+  const label = el.querySelector('.ts');
+  if (label) label.textContent = TOPO_LABEL[state] || state;
+  // 状态真的变了才放涟漪 —— 每次轮询都放的话画面会一直在闪
+  if (before !== state && (state === 'running' || state === 'stopped')) {
+    topo.bursts.push({ id, p: 1 });
+  }
+}
+
+/* 从引擎把粒子撒向某个服务（或反向）。方向就是"电在往哪流"。 */
+function topoFlow(target, reverse = false, count = 14) {
+  for (let i = 0; i < count; i++) {
+    topo.particles.push({
+      from: reverse ? target : 'docker',
+      to: reverse ? 'docker' : target,
+      t: -i * 0.05, speed: 0.012 + Math.random() * 0.008,
+      r: 1.4 + Math.random() * 1.4,
+      hue: reverse ? '#fbbf24' : '#2dd4a7',
+    });
+  }
+}
+
+function topoTick() {
+  const c = topo.ctx;
+  if (!c) { requestAnimationFrame(topoTick); return; }
+
+  // 每帧自检容器尺寸。这是**兜底**，不是主路径。
+  //
+  // 为什么不只靠 ResizeObserver / rAF：这一页大部分时间是 `display:none` 的，
+  // 隐藏时容器量到 0×0；切过来那一刻布局什么时候完成、事件什么时候派发，
+  // 各浏览器不完全一致。实测就踩到过：切到这一页 canvas 仍是 0×0，一片空白。
+  //
+  // tick 本来就在跑，顺手量一下尺寸的成本可以忽略，换来的是"不管什么原因变了、
+  // 也不管事件有没有派发，画面一定会跟上"。
+  const box = $('#topo');
+  if (box) {
+    const r = box.getBoundingClientRect();
+    if (Math.abs(r.width - topo.w) > 1 || Math.abs(r.height - topo.h) > 1) {
+      resizeTopo();
+    }
+  }
+
+  topo.t += 0.016;
+  c.clearRect(0, 0, topo.w, topo.h);
+
+  const engine = topo.nodes['docker'];
+  const engineOn = topoStateOf('docker') === 'ready';
+
+  // 连线：引擎 → 每个服务。服务亮着就点亮这条线。
+  if (engine) {
+    for (const id of ['govfin-agent', 'govfin-embedding', 'govfin-console']) {
+      const n = topo.nodes[id];
+      if (!n) continue;
+      const st = topoStateOf(id);
+      const lit = st === 'running';
+      const busy = st === 'starting' || st === 'stopping';
+
+      c.beginPath();
+      const my = (engine.y + n.y) / 2;
+      c.moveTo(engine.x, engine.y);
+      c.bezierCurveTo(engine.x, my, n.x, my, n.x, n.y);
+      c.strokeStyle = lit ? '#2dd4a7' : (busy ? '#5b93ff' : '#3a4a70');
+      c.globalAlpha = lit ? 0.45 : (busy ? 0.5 : 0.16);
+      c.lineWidth = lit ? 1.8 : 1.1;
+      if (busy) { c.shadowBlur = 12; c.shadowColor = '#5b93ff'; }
+      c.stroke();
+      c.shadowBlur = 0; c.globalAlpha = 1;
+    }
+  }
+
+  // 粒子
+  const alive = [];
+  for (const p of topo.particles) {
+    p.t += p.speed;
+    if (p.t > 1) continue;
+    const A = topo.nodes[p.from], B = topo.nodes[p.to];
+    if (!A || !B) continue;
+    const k = p.t < .5 ? 2 * p.t * p.t : 1 - Math.pow(-2 * p.t + 2, 2) / 2;
+    const x = A.x + (B.x - A.x) * k, y = A.y + (B.y - A.y) * k;
+    c.beginPath();
+    c.arc(x, y, p.r, 0, Math.PI * 2);
+    c.fillStyle = p.hue;
+    c.globalAlpha = Math.sin(p.t * Math.PI) * 0.95;
+    c.shadowBlur = 14; c.shadowColor = p.hue;
+    c.fill();
+    c.shadowBlur = 0; c.globalAlpha = 1;
+    alive.push(p);
+  }
+  topo.particles = alive.slice(-320);
+
+  // 涟漪
+  const keep = [];
+  for (const b of topo.bursts) {
+    b.p -= 0.02;
+    if (b.p <= 0) continue;
+    const n = topo.nodes[b.id];
+    if (n) {
+      c.beginPath();
+      c.arc(n.x, n.y, 26 + (1 - b.p) * 74, 0, Math.PI * 2);
+      c.strokeStyle = topoStateOf(b.id) === 'running' ? '#2dd4a7' : '#5b93ff';
+      c.globalAlpha = b.p * 0.5;
+      c.lineWidth = 2;
+      c.stroke();
+      c.globalAlpha = 1;
+    }
+    keep.push(b);
+  }
+  topo.bursts = keep;
+
+  // 引擎在线时，它自己有一层缓慢呼吸的辉光
+  if (engineOn && engine) {
+    const b = 0.5 + 0.5 * Math.sin(topo.t * 1.6);
+    c.beginPath();
+    c.arc(engine.x, engine.y, 40 + b * 12, 0, Math.PI * 2);
+    c.fillStyle = 'rgba(45,212,167,.05)';
+    c.fill();
+  }
+
+  requestAnimationFrame(topoTick);
+}
+
+/* 把后端给的结构化状态贴到拓扑上。 */
+function topoApply(state) {
+  if (!state) return;
+  if (state.docker) setNodeState('docker', state.docker === 'ready' ? 'ready' : state.docker);
+
+  const services = state.services || {};
+  for (const [name, st] of Object.entries(services)) {
+    const prev = topoStateOf(name);
+    setNodeState(name, st);
+    // 状态发生"跨阶段"变化时撒粒子：从没在跑 → 在跑（启动），
+    // 或从在跑 → 停了（关闭）。中间态不撒，否则粒子会连着放好几轮。
+    if (prev !== st) {
+      if (st === 'starting') topoFlow(name, false, 10);
+      if (st === 'stopping') topoFlow(name, true, 10);
+    }
+  }
+}
+
+/* 相位条 */
+function setPhase(text, kind = '') {
+  const box = $('#tphase'), t = $('#tphaseText');
+  if (!box || !t) return;
+  box.className = 'tphase ' + kind;
+  t.textContent = text;
+}
+
+/* ===========================================================================
+   启动 / 关闭
+   =========================================================================== */
+
+let svcPoll = null;
+
+async function runServiceAction(action, label) {
   const log = $('#startLog');
+  const btnStart = $('#btnStart'), btnStop = $('#btnStop');
   log.classList.remove('hidden');
   log.textContent = '';
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>启动中';
+  btnStart.disabled = btnStop.disabled = true;
 
   try {
-    const r = await fetch('/api/services/start', { method: 'POST' });
+    const r = await fetch(`/api/services/${action}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stop_docker: false }),
+    });
     const job = await r.json();
     if (!r.ok) {
-      log.textContent = job.detail?.error || job.detail?.hint || '启动失败';
-      resetStartBtn(); return;
+      const msg = job.detail?.error || job.detail?.hint || `${label}失败`;
+      log.textContent = msg;
+      setPhase(msg, 'bad');
+      resetSvcButtons(); return;
     }
+
     let offset = 0;
-    clearInterval(startPoll);
-    startPoll = setInterval(async () => {
+    clearInterval(svcPoll);
+    svcPoll = setInterval(async () => {
       try {
         const d = await (await fetch(`/api/deploy/log?job_id=${job.job_id}&offset=${offset}`)).json();
         if (d.lines?.length) {
@@ -1004,31 +1388,54 @@ async function startServices() {
           for (const line of d.lines) {
             const el = document.createElement('div');
             el.textContent = line || ' ';
-            if (/✓|已启动|就绪|服务已就绪/.test(line)) el.className = 'l-ok';
+            if (/✓|已启动|已停止|就绪/.test(line)) el.className = 'l-ok';
             else if (/✗|失败|未就绪/.test(line)) el.className = 'l-bad';
-            else if (/^[^ ·↺+]/.test(line)) el.className = 'l-hd';
             log.appendChild(el);
           }
           if (atBottom) log.scrollTop = log.scrollHeight;
           offset = d.next_offset;
         }
+        topoApply(d);
+        if (d.message) setPhase(d.message, d.done ? (d.ok ? 'ok' : 'bad') : '');
         if (d.done) {
-          clearInterval(startPoll);
-          resetStartBtn();
-          await loadStatus();          // 启动完就刷新状态，不用用户再点一次
-          if (d.ok) $('#tabDot').classList.add('hide');
+          clearInterval(svcPoll);
+          resetSvcButtons();
+          await loadStatus();
         }
-      } catch (e) { clearInterval(startPoll); resetStartBtn(); }
+      } catch (e) { clearInterval(svcPoll); resetSvcButtons(); }
     }, 700);
   } catch (e) {
-    log.textContent = '启动失败：' + e.message;
-    resetStartBtn();
+    log.textContent = `${label}失败：` + e.message;
+    setPhase(String(e.message), 'bad');
+    resetSvcButtons();
   }
 }
 
-function resetStartBtn() {
-  const btn = $('#btnStart');
-  btn.disabled = false; btn.textContent = '一键启动';
+function startServices() { return runServiceAction('start', '启动'); }
+function stopServices()  { return runServiceAction('stop', '关闭'); }
+
+function resetSvcButtons() {
+  const b1 = $('#btnStart'), b2 = $('#btnStop');
+  if (b1) { b1.disabled = false; b1.textContent = '一键启动'; }
+  if (b2) { b2.disabled = false; b2.textContent = '一键关闭'; }
+}
+
+/* 页面加载时先把真实状态贴上去 —— 不依赖有没有任务在跑。 */
+async function syncServiceState() {
+  if (isFile) return;
+  try {
+    const d = await (await fetch('/api/services/state')).json();
+    topoApply(d);
+    const allUp = Object.values(d.services || {}).every(s => s === 'running');
+    const anyUp = Object.values(d.services || {}).some(s => s === 'running');
+    setPhase(
+      d.docker !== 'ready' ? 'Docker 引擎未运行 —— 点「一键启动」拉起'
+        : allUp ? '全部服务运行中'
+        : anyUp ? '部分服务未运行'
+        : '服务未启动',
+      d.docker !== 'ready' || !allUp ? '' : 'ok'
+    );
+  } catch (e) { /* 静默：状态页那边会给更详细的说明 */ }
 }
 
 async function loadStatus(manual) {
@@ -1274,8 +1681,16 @@ function pollDeploy(jobId) {
    =========================================================================== */
 
 initViz();
+initTopo();
 loadSteps().then(() => { if (!isFile) loadStatus(); });
 setTimeout(loadStatus, 900);
+if (!isFile) {
+  // 拓扑先按真实状态亮起来，不等用户点。
+  syncServiceState();
+  // 平时缓慢轮询：别人在别处改了状态（比如另开一个窗口点了关闭），这边能跟上。
+  // 8 秒一次——够及时，又不会把状态探测打成负担。
+  setInterval(syncServiceState, 8000);
+}
 </script>
 </body>
 </html>
