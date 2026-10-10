@@ -276,6 +276,13 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         '    def state_view',
         "tests/test_desktop_app.py::test_job_tracks_structured_state_not_just_text",
     ),
+    (
+        "置信度绕过 confText（界面显示 [object Object]）",
+        "app/static/index.html",
+        "置信度 ${confText(p.confidence)}",
+        "置信度 ${esc(p.confidence ?? '—')}",
+        "tests/test_desktop_app.py::test_confidence_is_rendered_through_the_shape_aware_helper",
+    ),
 ]
 
 

@@ -148,12 +148,12 @@ python -X utf8 -m govfin.a2a.server --port 8940 --ingest data
 | 触发依据 | `连续异常月数上限` 观测 3 ≥ 阈值 3（条款 银保监发〔2024〕12号-§4.1） |
 | 采纳推理链 | 7 条（逐环带 `source_document` + `source_locator`） |
 | 依据漂移 | 0 项 |
-| 测试 | **289 条用例全部通过**（276 回归 + 13 规模压力） |
+| 测试 | **291 条用例全部通过**（278 回归 + 13 规模压力） |
 
 ## 六、测试
 
 ```bash
-python -X utf8 -m pytest -q              # 276 条，约 7 秒
+python -X utf8 -m pytest -q              # 278 条，约 7 秒
 python -X utf8 -m pytest -q -m stress    # 追加 13 条十万级规模压力
 ```
 
@@ -188,7 +188,7 @@ nexent/skills/  3 份 Skill 工作流模板 + 可直接导入的 zip
 deploy/         容器化部署件 · Nexent 接入配置
 docs/           架构 · 置信度模型 · 本体演化 · 决策溯源 · 测试报告
 data/           样例多模态数据集（含 OCR 边车）
-tests/          289 条用例
+tests/          291 条用例
 ```
 
 ## 八、文档

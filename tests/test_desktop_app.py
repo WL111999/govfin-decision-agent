@@ -653,3 +653,49 @@ def test_set_phase_does_not_write_a_log_line(app_deploy):
     job.set_phase("docker", "检查 Docker")
     assert len(job.lines) == before, "set_phase 往日志里写了东西"
     assert job.snapshot()["message"] == "检查 Docker", "message 没被记下来"
+
+
+# ---------------------------------------------------------------------------
+# 前端渲染的数据契约
+#
+# 前端没有 JS 测试框架，所以这几条只能检查"代码用了正确的取值方式"，
+# 而不是"渲染出了正确的字符串"。它们挡不住所有问题，但能挡住**最恶心的那一类**：
+# 字段形状变了、渲染代码没跟上，界面上出现 `[object Object]`——
+# 而那是用户唯一看得见的线索，除了"这东西坏了"什么也说明不了。
+# ---------------------------------------------------------------------------
+
+
+def _ui_source() -> str:
+    return (_ROOT / "app" / "static" / "index.html").read_text(encoding="utf-8")
+
+
+def test_confidence_is_rendered_through_the_shape_aware_helper():
+    """置信度必须经 confText 渲染，不能直接塞进模板字符串。
+
+    这个字段在**两条通道里形状不同**：
+        kg_path_query    → 对象 {score, hop_count, geometry_factor, ...}
+        evidence_bundle  → 数字
+    直接 `esc(x)` 的话，对象那一路会渲染成 `[object Object]`（实测踩到）。
+    """
+    src = _ui_source()
+    assert "function confText(" in src, "没有 confText 辅助函数"
+    # 两处渲染都必须走它
+    assert "confText(p.confidence)" in src, "跨域推理面板没走 confText"
+    assert "confText(c.confidence)" in src, "依据回执面板没走 confText"
+    # 不能有绕过它的写法残留
+    assert "esc(p.confidence" not in src, "还有绕过 confText 的写法"
+    assert "esc(c.confidence" not in src, "还有绕过 confText 的写法"
+
+
+def test_confText_handles_both_shapes():
+    """confText 的逻辑本身：两种形状都要能出数字。
+
+    用 Python 复刻同一套规则来验证——不是完美的等价测试（JS 与 Python 的
+    Number 语义不完全一样），但足以钉住"对象要取 .score"这个关键分支。
+    真正跑一遍 JS 需要 Node，为这一条引进来不划算。
+    """
+    src = _ui_source()
+    body = src.split("function confText(", 1)[1].split("\n}", 1)[0]
+    assert "v.score" in body, "对象形态没有取 .score"
+    assert "typeof v === 'object'" in body, "没有区分对象与数字"
+    assert "toFixed(4)" in body, "没有格式化到四位小数（和别处的精度不一致）"

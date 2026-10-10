@@ -120,7 +120,7 @@ button.ghost:hover:not(:disabled){background:#1b2440;color:var(--ink);box-shadow
 button.tiny{padding:6px 13px;font-size:12.5px;border-radius:8px}
 /* 服务不可用时，"一键启动"是页面上唯一该被点的那颗按钮。
    轻微脉冲而不是闪烁：目的是把视线引过去，不是让人焦虑。 */
-button.urgent{animation:urgent 2.4s ease-in-out infinite}
+button.urgent{animation:urgent 4.8s ease-in-out infinite}
 @keyframes urgent{
   0%,100%{box-shadow:0 0 0 0 rgba(77,141,255,.55)}
   50%{box-shadow:0 0 0 9px rgba(77,141,255,0)}
@@ -137,28 +137,68 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
   padding:12px 15px;border-radius:10px;font-size:13px;margin-top:14px}
 .empty{color:var(--ink-3);font-size:13px;padding:24px 0;text-align:center}
 .spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.25);
-  border-top-color:#fff;border-radius:50%;animation:spin .66s linear infinite;vertical-align:-1px;margin-right:7px}
+  border-top-color:#fff;border-radius:50%;animation:spin 1.32s linear infinite;vertical-align:-1px;margin-right:7px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ---- 决策工作台 ---- */
-.searchbar{display:flex;gap:10px;margin-bottom:16px}
-.searchbar input{flex:1;padding:13px 16px;font-size:15px}
-.searchbar button{padding:13px 28px;font-size:14.5px}
+.searchbar{display:flex;gap:12px;margin-bottom:18px}
+.searchbar input{
+  flex:1;padding:14px 18px;font-size:15px;
+  background:linear-gradient(180deg, rgba(16,22,40,.9), rgba(11,16,30,.85));
+  border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 6px 20px rgba(0,0,0,.3);
+}
+.searchbar input:focus{
+  border-color:rgba(91,147,255,.55);
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 0 0 3px rgba(91,147,255,.14), 0 6px 20px rgba(0,0,0,.3);
+}
+.searchbar button{padding:14px 32px;font-size:14.5px;border-radius:12px;
+  box-shadow:0 4px 22px rgba(91,147,255,.32)}
+.searchbar button:hover:not(:disabled){box-shadow:0 6px 30px rgba(91,147,255,.45)}
 
 /* 舞台：canvas 画连线与粒子，按钮浮在上面。
    两者分开是为了让文字能被选中复制——canvas 里的字选不了。 */
-.stage{position:relative;height:380px;margin-bottom:6px;
-  background:radial-gradient(ellipse at 50% 0%,#0f1729 0%,#0a0e1a 70%);
-  border:1px solid var(--line);border-radius:var(--radius,14px);overflow:hidden}
+.stage{
+  position:relative;height:400px;margin-bottom:6px;border-radius:16px;overflow:hidden;
+  /* 四层叠加：顶部聚光 + 底部反光 + 中央柔光 + 暗角。
+     单层渐变会显得平——层次感来自"不同方向的光叠在一起"，
+     这和真实打光的道理一样。 */
+  background:
+    radial-gradient(ellipse 70% 45% at 50% -8%, rgba(91,147,255,.16), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 108%, rgba(34,211,238,.08), transparent 70%),
+    radial-gradient(ellipse 90% 70% at 50% 50%, rgba(30,42,72,.55), transparent 75%),
+    linear-gradient(180deg, #0a0f1e, #06090f);
+  border:1px solid var(--line);
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 18px 48px rgba(0,0,0,.45);
+}
+/* 暗角：把视线收拢到中央。加与不加的区别是"元素浮在页面上"
+   和"元素在一个空间里"。 */
+.stage::after{
+  content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(ellipse 78% 78% at 50% 50%, transparent 55%, rgba(0,0,0,.4));
+}
 #viz{position:absolute;inset:0;width:100%;height:100%}
 
 .node{
   position:absolute;transform:translate(-50%,-50%);
-  min-width:136px;padding:12px 14px;border-radius:12px;cursor:pointer;
-  background:rgba(22,29,49,.9);border:1px solid #26314f;
+  min-width:140px;padding:13px 16px;border-radius:13px;cursor:pointer;
+  background:linear-gradient(180deg, rgba(28,37,62,.92), rgba(15,21,38,.88));
+  border:1px solid var(--line);
   transition:.2s cubic-bezier(.4,0,.2,1);user-select:none;
-  backdrop-filter:blur(6px);
+  backdrop-filter:blur(10px) saturate(1.15);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.05) inset,
+    0 8px 24px rgba(0,0,0,.42);
 }
+/* 渐变描边，和卡片同一套做法 */
+.node::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;
+  background:linear-gradient(135deg, rgba(140,175,255,.3), transparent 45%, transparent 70%, rgba(34,211,238,.16));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  pointer-events:none;opacity:0;transition:opacity .2s;
+}
+.node:hover::before{opacity:1}
 .node:hover{border-color:#3a4a75;transform:translate(-50%,-50%) translateY(-2px)}
 .node .ic{font-size:16px;line-height:1;margin-bottom:6px;display:block;filter:grayscale(.55) opacity(.6);transition:.3s}
 .node .nm{font-size:13px;font-weight:500;color:var(--ink-2);transition:.3s;white-space:nowrap}
@@ -170,14 +210,17 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
 }
 
 /* 四态。用 glow 而不是改背景色：背景一改，卡片之间的层级感就乱了 */
-.node.running{border-color:var(--accent);box-shadow:0 0 0 1px rgba(77,141,255,.35),0 0 26px rgba(77,141,255,.32);
-  animation:breathe 1.5s ease-in-out infinite}
-@keyframes breathe{0%,100%{box-shadow:0 0 0 1px rgba(77,141,255,.3),0 0 18px rgba(77,141,255,.2)}
-                   50%{box-shadow:0 0 0 1px rgba(77,141,255,.55),0 0 34px rgba(77,141,255,.5)}}
+.node.running{border-color:var(--accent);
+  animation:breathe 3s ease-in-out infinite}
+@keyframes breathe{
+  0%,100%{box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 0 0 1px rgba(91,147,255,.3), 0 0 20px rgba(91,147,255,.22), 0 8px 24px rgba(0,0,0,.42)}
+  50%    {box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 0 0 1px rgba(91,147,255,.6), 0 0 40px rgba(91,147,255,.5), 0 8px 24px rgba(0,0,0,.42)}
+}
 .node.running .ic{filter:none;opacity:1}
 .node.running .nm{color:#fff}
 .node.running .badge{background:var(--accent);box-shadow:0 0 10px var(--accent)}
-.node.done{border-color:rgba(45,212,167,.45)}
+.node.done{border-color:rgba(45,212,167,.42);
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 0 0 1px rgba(45,212,167,.1), 0 0 22px rgba(45,212,167,.16), 0 8px 24px rgba(0,0,0,.42)}
 .node.done .ic{filter:none;opacity:1}
 .node.done .nm{color:var(--ink)}
 .node.done .badge{background:var(--ok);box-shadow:0 0 10px rgba(45,212,167,.7)}
@@ -191,25 +234,44 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
 /* 结果面板 */
 .results{margin-top:18px}
 .rpanel{
-  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
-  margin-bottom:12px;overflow:hidden;animation:slideIn .34s cubic-bezier(.2,.8,.3,1)
+  position:relative;
+  background:linear-gradient(180deg, rgba(26,34,58,.72), rgba(15,21,38,.62));
+  border:1px solid var(--line);border-radius:var(--r);
+  margin-bottom:14px;overflow:hidden;
+  backdrop-filter:blur(16px) saturate(1.2);
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 10px 32px rgba(0,0,0,.36);
+  animation:slideIn .68s cubic-bezier(.2,.8,.3,1)
+}
+.rpanel::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;
+  background:linear-gradient(135deg, rgba(140,175,255,.36), rgba(91,147,255,.05) 38%, transparent 68%, rgba(34,211,238,.18));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  pointer-events:none;
 }
 @keyframes slideIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-.rhead{display:flex;align-items:center;gap:10px;padding:13px 18px;
-  background:var(--panel-2);border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+.rhead{display:flex;align-items:center;gap:11px;padding:14px 20px;
+  background:linear-gradient(180deg, rgba(34,44,72,.5), rgba(24,32,54,.35));
+  border-bottom:1px solid var(--line);cursor:pointer;user-select:none;
+  transition:background .16s}
+.rhead:hover{background:linear-gradient(180deg, rgba(40,52,84,.6), rgba(28,37,62,.45))}
 .rhead .ic{font-size:15px}
 .rhead .tt{font-weight:500;font-size:13.5px}
-.rhead .ms{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.rhead .ms{margin-left:auto;font-size:11.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;padding:2px 9px;border-radius:6px;
+  background:rgba(91,147,255,.08);border:1px solid rgba(91,147,255,.14)}
 .rhead .caret{color:var(--ink-3);font-size:11px;transition:.2s}
 .rpanel.folded .caret{transform:rotate(-90deg)}
 .rpanel.folded .rbody{display:none}
-.rbody{padding:16px 18px}
+.rbody{padding:18px 20px}
 
 .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:13px;margin:10px 0}
 .kv dt{color:var(--ink-3);font-size:12.5px;white-space:nowrap}
 .kv dd{color:var(--ink)}
 
-.rec{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:11px 14px;margin-bottom:8px}
+.rec{background:linear-gradient(180deg, rgba(28,37,62,.6), rgba(18,25,44,.5));
+  border:1px solid var(--line);border-radius:10px;padding:12px 15px;margin-bottom:9px;
+  box-shadow:0 1px 0 rgba(255,255,255,.03) inset}
 .rec .rl{font-size:12.5px;color:var(--ink-2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pill{font-size:11px;padding:1.5px 8px;border-radius:20px;background:#1e2842;color:var(--ink-2)}
 .pill.ok{background:rgba(45,212,167,.14);color:#5fe0b8}
@@ -218,13 +280,15 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
 
 /* 结论卡 */
 .verdict{
-  display:flex;align-items:center;gap:26px;padding:22px 26px;border-radius:14px;
-  background:linear-gradient(135deg,rgba(255,77,109,.09),rgba(255,77,109,.02));
-  border:1px solid rgba(255,77,109,.28);margin-bottom:16px;
+  display:flex;align-items:center;gap:28px;padding:26px 30px;border-radius:16px;
+  background:linear-gradient(135deg,rgba(255,77,109,.11),rgba(255,77,109,.02));
+  border:1px solid rgba(255,77,109,.3);margin-bottom:18px;
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 10px 34px rgba(0,0,0,.35);
 }
 .verdict.good{background:linear-gradient(135deg,rgba(45,212,167,.09),transparent);border-color:rgba(45,212,167,.28)}
 .verdict.mid{background:linear-gradient(135deg,rgba(251,191,36,.1),transparent);border-color:rgba(251,191,36,.3)}
-.verdict .big{font-size:26px;font-weight:600;letter-spacing:.01em}
+.verdict .big{font-size:29px;font-weight:600;letter-spacing:.01em;
+  text-shadow:0 0 26px rgba(255,255,255,.14)}
 .verdict .sub{color:var(--ink-2);font-size:12.5px;margin-top:2px}
 
 /* 置信度环 */
@@ -237,14 +301,14 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
 .thr{margin-top:14px}
 .thr .lbl{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-2);margin-bottom:7px}
 .thr .bar{height:9px;border-radius:5px;background:#1a2238;overflow:hidden;position:relative}
-.thr .fill{height:100%;width:0;border-radius:5px;transition:width 1.05s cubic-bezier(.3,.9,.3,1);
+.thr .fill{height:100%;width:0;border-radius:5px;transition:width 2.1s cubic-bezier(.3,.9,.3,1);
   background:linear-gradient(90deg,var(--accent),var(--accent-2))}
 .thr.hit .fill{background:linear-gradient(90deg,#ff8a3d,var(--bad));box-shadow:0 0 16px rgba(255,77,109,.55)}
 .thr.hit .lbl{color:#ff9aae}
 .thr .mark{position:absolute;top:-3px;width:2px;height:15px;background:var(--ink-3);border-radius:1px}
 
 /* 证据链 */
-.chain{border-left:2px solid #24304d;padding:2px 0 2px 15px;margin:12px 0;position:relative}
+.chain{border-left:2px solid rgba(70,90,140,.45);padding:3px 0 3px 16px;margin:14px 0;position:relative}
 .chain::before{content:'';position:absolute;left:-5px;top:8px;width:8px;height:8px;border-radius:50%;
   background:var(--accent);box-shadow:0 0 9px var(--glow)}
 .chain .ch{font-size:13px;font-weight:500;margin-bottom:5px}
@@ -325,7 +389,7 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
 
 .tnode.starting,.tnode.stopping{
   border-color:var(--accent);
-  animation:nodePulse 1.4s ease-in-out infinite;
+  animation:nodePulse 2.8s ease-in-out infinite;
 }
 .tnode.starting .ti,.tnode.stopping .ti{filter:none;opacity:1}
 .tnode.starting .tn,.tnode.stopping .tn{color:var(--ink)}
@@ -353,7 +417,7 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
 }
 .tphase .tp-dot{
   width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;
-  box-shadow:0 0 10px var(--accent);animation:nodePulse 1.3s ease-in-out infinite;
+  box-shadow:0 0 10px var(--accent);animation:nodePulse 2.6s ease-in-out infinite;
 }
 .tphase.idle{background:transparent;border-color:var(--line)}
 .tphase.idle .tp-dot{background:var(--ink-3);box-shadow:none;animation:none}
@@ -589,7 +653,7 @@ function resizeViz() {
 function edgeKey(a, b) { return a + '>' + b; }
 
 function tick() {
-  viz.t += 0.016;
+  viz.t += 0.008;
   const c = viz.ctx;
   c.clearRect(0, 0, viz.w, viz.h);
 
@@ -627,7 +691,7 @@ function tick() {
   // 涟漪
   for (const n of Object.values(viz.nodes)) {
     if (n.ripple <= 0) continue;
-    n.ripple -= 0.018;
+    n.ripple -= 0.009;
     if (n.ripple <= 0) { n.ripple = 0; continue; }
     const p = 1 - n.ripple;
     c.beginPath();
@@ -687,7 +751,7 @@ function drawEdge(c, a, b, e) {
 const bez = (p0,p1,p2,p3,t) =>
   Math.pow(1-t,3)*p0 + 3*Math.pow(1-t,2)*t*p1 + 3*(1-t)*t*t*p2 + t*t*t*p3;
 
-function animateEdge(a, b, to, ms = 620) {
+function animateEdge(a, b, to, ms = 1240) {
   const k = edgeKey(a, b);
   const e = viz.edges[k] || (viz.edges[k] = { progress: 0, active: false });
   const from = e.progress;
@@ -705,7 +769,7 @@ function emitParticles(a, b, n = 16) {
   const color = COLORS.done;
   for (let i = 0; i < n; i++) {
     viz.particles.push({
-      a, b, t: -i * 0.045, speed: 0.011 + Math.random() * 0.006,
+      a, b, t: -i * 0.09, speed: 0.0055 + Math.random() * 0.003,
       r: 1.6 + Math.random() * 1.5, color,
     });
   }
@@ -982,12 +1046,27 @@ function financeBody(d) {
   return h;
 }
 
+/* 置信度字段在两条通道里形状不同：
+     kg_path_query     → 对象（{score, hop_count, geometry_factor, ...}）
+     evidence_bundle   → 数字
+   直接塞进模板字符串就会渲染成 `[object Object]`（实测踩到）。
+   这里统一取"那个可显示的分数"。 */
+function confText(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'object') {
+    const s = v.score ?? v.confidence;
+    return s === undefined || s === null ? '—' : Number(s).toFixed(4);
+  }
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(4) : String(v);
+}
+
 function graphBody(d) {
   const paths = d.paths || [];
   if (!paths.length) return '<div class="empty">没有命中推理路径</div>';
   return paths.slice(0, 6).map(p => `<div class="chain">
     <div class="ch">${esc(p.chain || '')}</div>
-    <div class="meta">置信度 ${esc(p.confidence ?? '—')} · ${esc(p.hops ?? '—')} 跳 · ${esc(p.constraint || '')}</div>
+    <div class="meta">置信度 ${confText(p.confidence)} · ${esc(p.hops ?? '—')} 跳 · ${esc(p.constraint || '')}</div>
     ${(p.evidence || []).slice(0, 4).map(e =>
       `<div class="hop">${esc((e.snippet || '').slice(0, 80))}
        <span class="src">　${esc(e.source_document || '')}</span></div>`).join('')}
@@ -1039,10 +1118,10 @@ function decideBody(d) {
   queueAnimation((root) => {
     const box = root.querySelector('.verdict');
     const conf = Number(box?.dataset.conf || 0);
-    root.querySelectorAll('.gauge .val').forEach(el => rollNumber(el, conf, 900));
+    root.querySelectorAll('.gauge .val').forEach(el => rollNumber(el, conf, 1800));
     root.querySelectorAll('.gauge circle[data-ring]').forEach(c => {
       const len = 2 * Math.PI * 36;
-      c.style.transition = 'stroke-dashoffset 1s cubic-bezier(.2,.8,.3,1)';
+      c.style.transition = 'stroke-dashoffset 2s cubic-bezier(.2,.8,.3,1)';
       c.style.strokeDashoffset = String(len * (1 - conf));
     });
     root.querySelectorAll('.thr .fill').forEach(f => {
@@ -1059,9 +1138,9 @@ function evidenceBody(d) {
   let h = kv(d, [['采纳链', chains.length], ['被拒链', (d.rejected_chains || []).length],
                  ['依据条款', (d.clauses || []).length],
                  ['依据漂移', (d.drift_count ? d.drift_count + ' 项' : '无')]]);
-  h += chains.slice(0, 7).map((c, i) => `<div class="chain" style="animation:slideIn .4s ${i * 60}ms both">
+  h += chains.slice(0, 7).map((c, i) => `<div class="chain" style="animation:slideIn .8s ${i * 120}ms both">
     <div class="ch">${esc(c.chain || '')}</div>
-    <div class="meta">${esc(c.constraint || '')} · 置信度 ${esc(c.confidence ?? '—')} · ${esc(c.hops ?? '—')} 跳</div>
+    <div class="meta">${esc(c.constraint || '')} · 置信度 ${confText(c.confidence)} · ${esc(c.hops ?? '—')} 跳</div>
     ${(c.evidence || []).slice(0, 4).map(e =>
       `<div class="hop">${esc((e.snippet || '').slice(0, 90))}
        <span class="src">　${esc(e.evidence_class === 'direct' ? '直接' : '派生')} · ${esc(e.source_document || '')} · ${esc(e.source_locator || '')}</span></div>`).join('')}
@@ -1220,7 +1299,7 @@ function topoFlow(target, reverse = false, count = 14) {
     topo.particles.push({
       from: reverse ? target : 'docker',
       to: reverse ? 'docker' : target,
-      t: -i * 0.05, speed: 0.012 + Math.random() * 0.008,
+      t: -i * 0.1, speed: 0.006 + Math.random() * 0.004,
       r: 1.4 + Math.random() * 1.4,
       hue: reverse ? '#fbbf24' : '#2dd4a7',
     });
@@ -1247,7 +1326,7 @@ function topoTick() {
     }
   }
 
-  topo.t += 0.016;
+  topo.t += 0.008;
   c.clearRect(0, 0, topo.w, topo.h);
 
   const engine = topo.nodes['docker'];
@@ -1298,7 +1377,7 @@ function topoTick() {
   // 涟漪
   const keep = [];
   for (const b of topo.bursts) {
-    b.p -= 0.02;
+    b.p -= 0.01;
     if (b.p <= 0) continue;
     const n = topo.nodes[b.id];
     if (n) {
