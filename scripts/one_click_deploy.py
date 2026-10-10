@@ -31,7 +31,7 @@ import sys
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-NEXENT_SRC = pathlib.Path(r"nexent_src")
+NEXENT_SRC = nexent_local.find_nexent_src() or pathlib.Path("nexent_src")
 
 # Windows 上 Docker Desktop 的默认安装位置。PATH 里通常没有 docker，
 # 因为安装程序只把它加进 Docker Desktop 自己的 shell，不加进系统 PATH。
@@ -74,6 +74,9 @@ CONTAINERS = {
 }
 
 NEXENT_NETWORK = "nexent_network"
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import nexent_local as credentials  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -255,10 +258,14 @@ def _console_env_args() -> list[str]:
     args: list[str] = []
     if anon:
         args += ["-e", f"NEXENT_ANON_KEY={anon}"]
-    args += [
-        "-e", "NEXENT_EMAIL=govfin@nexent-demo.com",
-        "-e", "NEXENT_PASSWORD=***REDACTED***",
-    ]
+    # 凭据从本地 .env 读（不进版本库）。没有就只传邮箱——
+    # 控制台会显示"未配置"，而不是拿到一个公开的默认密码。
+    try:
+        email, password = credentials.load()
+        args += ["-e", f"NEXENT_EMAIL={email}", "-e", f"NEXENT_PASSWORD={password}"]
+    except Exception:  # noqa: BLE001
+        args += ["-e", "NEXENT_EMAIL=govfin@nexent-demo.com"]
+    args += []
     return args
 
 
@@ -307,9 +314,14 @@ def do_done() -> None:
     print("  每一步都显示当前状态和该做什么。")
     print()
     print("  登录 Nexent 用租户账号（不是 suadmin）：")
-    print("    govfin@nexent-demo.com / ***REDACTED***")
+    try:
+        email, password = credentials.load()
+        print(f"    {email} / {credentials.mask(password)}")
+        print("    （完整密码见项目 .env；此处打码是为了日志不泄露）")
+    except Exception:  # noqa: BLE001
+        print("    还没有租户凭据——先跑一次 provision_tenant.py")
     print()
-    print("  导入智能体：桌面「Nexent导入件\\跨域授信决策智能体.zip」")
+    print("  导入智能体：项目目录下的「Nexent导入件」文件夹里那个 zip")
     print()
 
 

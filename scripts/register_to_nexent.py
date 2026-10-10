@@ -24,9 +24,12 @@ import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-NEXENT_SRC = pathlib.Path(r"nexent_src")
+NEXENT_SRC = nexent_local.find_nexent_src() or pathlib.Path("nexent_src")
 ENV_FILE = NEXENT_SRC / "deploy" / "env" / ".env"
 CONFIG_API = "http://localhost:5010"
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import nexent_local as credentials  # noqa: E402
 
 # 容器内主机名，不是 localhost —— Nexent 从自己的容器里访问 govfin。
 MCP_URL = "http://govfin-agent:8930/mcp"
@@ -61,7 +64,7 @@ def _request(method: str, url: str, *, headers=None, payload=None, body: bytes |
         return 0, f"{type(exc).__name__}: {exc}"
 
 
-def login(values: dict[str, str]) -> str | None:
+def login(values: dict[str, str], *, email: str = "", password: str = "") -> str | None:
     """用 Nexent 部署时自动创建的超管账号换一个 bearer token。
 
     密码从 .env 里读，不写死在这里：那份 .env 是部署脚本生成的，账号密码跟着部署走，
@@ -78,7 +81,7 @@ def login(values: dict[str, str]) -> str | None:
         "POST",
         f"{url}/auth/v1/token?grant_type=password",
         headers={"apikey": anon, "Content-Type": "application/json"},
-        payload={"email": "suadmin@nexent.com", "password": "***REDACTED***"},
+        payload={"email": email, "password": password},
     )
     if status != 200:
         print(f"  ✗ 登录失败 HTTP {status}: {body[:300]}")
@@ -133,7 +136,12 @@ def main() -> int:
         print("  ✗ 找不到 Nexent 的 .env；请先用 deploy/README.md 里的步骤部署 Nexent")
         return 1
     values = _env()
-    token = login(values)
+    try:
+        su_email, su_password = credentials.superadmin(NEXENT_SRC)
+    except LookupError as exc:
+        print(f"  ✗ {exc}")
+        return 1
+    token = login(values, email=su_email, password=su_password)
     if not token:
         return 1
     auth = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}

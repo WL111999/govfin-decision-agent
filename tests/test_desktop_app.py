@@ -271,12 +271,19 @@ def test_mask_secret_keeps_only_the_ends(app_paths):
     """打码保留前缀和末四位——够对上号，但不泄露中间。
 
     前端要展示"配的是哪一把"，但不该拿到完整密钥。
+
+    **这里用的必须是编造的密钥。** 早先这条测试拿真实 key 当输入，
+    于是它连同密钥一起被提交到了公开仓库——测试数据也属于仓库内容，
+    不会因为它"只是测试"就不泄露。凡是要写进仓库的字面量，
+    都得当成会被全世界看到。
     """
-    masked = app_paths.mask_secret("***REDACTED***")
+    fake = "sk-" + "0123456789abcdef" * 2 + "beef"
+    masked = app_paths.mask_secret(fake)
     assert masked.startswith("sk-")
-    assert masked.endswith("f085")
-    assert "4fdd712a" not in masked, "打码后仍能看到密钥中段"
+    assert masked.endswith("beef"), f"末四位没保留：{masked}"
+    assert "0123456789abcdef" not in masked, "打码后仍能看到密钥中段"
     assert "*" * 8 in masked
+    assert len(masked) < len(fake), "打码后不该还是原长"
 
 
 def test_mask_secret_handles_short_and_empty(app_paths):

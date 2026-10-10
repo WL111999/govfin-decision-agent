@@ -368,7 +368,7 @@ def _deploy_steps(job: DeployJob) -> bool:
         job.log("")
         job.log("↺ 按设置跳过 Nexent 注册")
     else:
-        nexent_env = pathlib.Path(r"nexent_src") / "deploy" / "env" / ".env"
+        nexent_env = _nexent_src() / "deploy" / "env" / ".env"
         if not nexent_env.exists():
             job.log("")
             job.log(f"! 找不到 {nexent_env}")
@@ -395,6 +395,24 @@ def _deploy_steps(job: DeployJob) -> bool:
     job.log("控制台    http://localhost:8090")
     job.log("Nexent    http://localhost:3000")
     return True
+
+
+def _nexent_src() -> pathlib.Path:
+    """本机 Nexent 源码目录。
+
+    不写死路径：那样既是泄露开发机目录结构，也让别人 clone 下来跑不了。
+    这里复用 scripts/ 下那套解析（与项目同级的 nexent_src 是默认位置）。
+    """
+    import sys as _sys
+
+    scripts_dir = pathlib.Path(__file__).resolve().parent.parent / "scripts"
+    if str(scripts_dir) not in _sys.path:
+        _sys.path.insert(0, str(scripts_dir))
+    try:
+        import nexent_local
+        return nexent_local.require_nexent_src()
+    except Exception:  # noqa: BLE001
+        return pathlib.Path("nexent_src")
 
 
 def _has_network(docker: str, name: str) -> bool:
@@ -424,7 +442,7 @@ def _python() -> str:
 def _console_env_args(project: pathlib.Path) -> list[str]:
     """控制台容器要的凭据。从 Nexent 的 .env 取，不写死。"""
     args: list[str] = []
-    nexent_env = pathlib.Path(r"nexent_src") / "deploy" / "env" / ".env"
+    nexent_env = _nexent_src() / "deploy" / "env" / ".env"
     anon = ""
     if nexent_env.exists():
         for line in nexent_env.read_text(encoding="utf-8").splitlines():
@@ -433,14 +451,18 @@ def _console_env_args(project: pathlib.Path) -> list[str]:
                 break
     if anon:
         args += ["-e", f"NEXENT_ANON_KEY={anon}"]
+    # 租户凭据从本地 .env 读。读不到就**不传密码**——控制台会显示"未配置"，
+    # 而不是拿到一个写死在公开仓库里的默认密码。
     govfin_env = project / ".env"
-    password = "***REDACTED***"
     email = "govfin@nexent-demo.com"
+    password = ""
     if govfin_env.exists():
         values = _read_env(govfin_env)
-        email = values.get("NEXENT_TENANT_EMAIL", email)
-        password = values.get("NEXENT_TENANT_PASSWORD", password)
-    args += ["-e", f"NEXENT_EMAIL={email}", "-e", f"NEXENT_PASSWORD={password}"]
+        email = values.get("NEXENT_TENANT_EMAIL", email) or email
+        password = values.get("NEXENT_TENANT_PASSWORD", "")
+    args += ["-e", f"NEXENT_EMAIL={email}"]
+    if password:
+        args += ["-e", f"NEXENT_PASSWORD={password}"]
     return args
 
 

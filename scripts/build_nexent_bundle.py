@@ -34,11 +34,16 @@ import urllib.request
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-NEXENT_SRC = pathlib.Path(r"nexent_src")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import nexent_local  # noqa: E402
+
+NEXENT_SRC = nexent_local.find_nexent_src() or pathlib.Path("nexent_src")
 ENV_FILE = NEXENT_SRC / "deploy" / "env" / ".env"
 CONFIG_API = "http://localhost:5010"
 
-DEFAULT_OUT = pathlib.Path(r"Nexent导入件")
+# 产物目录。基于项目根而不是写死某个绝对路径——写死的话别人 clone 下来
+# 会直接崩（没有那个目录），而且顺带泄露了开发机的目录结构。
+DEFAULT_OUT = ROOT / "Nexent导入件"
 
 MCP_SERVER_NAME = "govfin-decision"
 MCP_URL = "http://govfin-agent:8930/mcp"
@@ -347,7 +352,7 @@ def main() -> int:
     tools: list[dict] = []
     if password:
         values = _env()
-        token = login(values, args.email, password) or login(values, "suadmin@nexent.com", "***REDACTED***")
+        token = login(values, args.email, password) if password else None
         if token:
             try:
                 tools = fetch_tools({"Authorization": f"Bearer {token}"})

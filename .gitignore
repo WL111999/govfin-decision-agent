@@ -46,3 +46,7 @@ desktop.ini
 build/
 *.spec
 GovFin.exe
+
+# Nexent 导入件的生成产物
+Nexent导入件/
+.origin_url

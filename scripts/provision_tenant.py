@@ -34,7 +34,9 @@ import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-NEXENT_SRC = pathlib.Path(r"nexent_src")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import nexent_local as credentials  # noqa: E402
+NEXENT_SRC = nexent_local.find_nexent_src() or pathlib.Path("nexent_src")
 ENV_FILE = NEXENT_SRC / "deploy" / "env" / ".env"
 CONFIG_API = "http://localhost:5010"
 
@@ -50,7 +52,10 @@ DEFAULT_EMAIL = "govfin@nexent-demo.com"
 # 而失败信息是"登录失败"，看起来像账号出了问题，实际是密码每次都不一样。
 # 演示环境要的是"随时能跑第二次"，安全边界由"这台机器谁能访问"决定，
 # 不由这个密码的随机性决定。
-DEFAULT_PASSWORD = "***REDACTED***"
+# 租户密码不再硬编码。首次运行时随机生成并写进项目 .env（已 gitignore），
+# 之后从那里读。公开仓库里出现任何"能直接用的凭据"都是问题——
+# 哪怕它只是本地演示环境的密码。
+
 SKILLS_DIR = ROOT / "nexent" / "skills" / "dist"
 
 
@@ -323,8 +328,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="在 Nexent 里开演示租户并装入 govfin")
     parser.add_argument("--tenant-name", default=DEFAULT_TENANT)
     parser.add_argument("--email", default=DEFAULT_EMAIL)
-    parser.add_argument("--password", default=DEFAULT_PASSWORD,
-                        help=f"租户账号密码，默认 {DEFAULT_PASSWORD}")
+    parser.add_argument("--password", default=None,
+                        help="租户账号密码；留空则从 .env 读，没有就生成一个并写入")
     args = parser.parse_args()
 
     print(f"[1] Nexent 配置：{ENV_FILE}")
@@ -333,7 +338,12 @@ def main() -> int:
         return 1
     values = _env()
 
-    su_token = login(values, "suadmin@nexent.com", "***REDACTED***")
+    try:
+        su_email, su_password = credentials.superadmin(NEXENT_SRC)
+    except LookupError as exc:
+        print(f"  ✗ {exc}")
+        return 1
+    su_token = login(values, su_email, su_password)
     if not su_token:
         print("  ✗ 平台管理员登录失败")
         return 1
@@ -359,7 +369,10 @@ def main() -> int:
     print(f"  ✓ 邀请码：{invite}")
 
     print(f"\n[4] 注册租户用户「{args.email}」")
-    password = args.password
+    if args.password:
+        password = args.password
+    else:
+        _, password = credentials.load_or_create(email_hint=args.email)
     if not signup(args.email, password, invite):
         return 1
 

@@ -23,9 +23,12 @@ import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-NEXENT_SRC = pathlib.Path(r"nexent_src")
+NEXENT_SRC = nexent_local.find_nexent_src() or pathlib.Path("nexent_src")
 ENV_FILE = NEXENT_SRC / "deploy" / "env" / ".env"
 CONFIG_API = "http://localhost:5010"
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import nexent_local as credentials  # noqa: E402
 
 KB_NAME = "govfin-regulation"
 KB_DESCRIPTION = "金融+政务领域制度依据：监管条款、征信规范、司法文书"
@@ -218,8 +221,14 @@ def upload_files(auth: dict, token: str, index_name: str, paths: list[pathlib.Pa
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="把领域文档灌进 Nexent 知识库")
-    parser.add_argument("--email", default="govfin@nexent-demo.com")
-    parser.add_argument("--password", default="***REDACTED***")
+    _email_default, _pwd_default = (None, None)
+    try:
+        _email_default, _pwd_default = credentials.load()
+    except Exception:  # noqa: BLE001
+        pass
+    parser.add_argument("--email", default=_email_default or "govfin@nexent-demo.com")
+    parser.add_argument("--password", default=_pwd_default,
+                        help="留空则从项目 .env 读租户凭据")
     parser.add_argument("--kb-name", default=KB_NAME)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true", help="重传已存在的文件")
@@ -230,9 +239,16 @@ def main() -> int:
         print("  ✗ 找不到 Nexent 的 .env；请先部署 Nexent")
         return 1
     values = _env()
-    token = login(values, args.email, args.password)
+    password = args.password
+    if not password:
+        try:
+            _, password = credentials.require()
+        except LookupError as exc:
+            print(f"  ✗ {exc}")
+            return 1
+    token = login(values, args.email, password)
     if not token:
-        print("  ✗ 登录失败；请确认租户账号密码（见 provision_tenant.py 的输出）")
+        print("  ✗ 登录失败；租户凭据见项目 .env 里的 NEXENT_TENANT_*")
         return 1
     auth = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     print(f"  ✓ 已登录 {args.email}")
