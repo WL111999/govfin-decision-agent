@@ -221,6 +221,30 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
         "    sys.stderr = _LogStream(\"stderr\")\n",
         "tests/test_desktop_app.py::test_install_streams_fills_only_missing_ones",
     ),
+    (
+        "一键启动里偷偷构建镜像",
+        "app/deploy.py",
+        '    job.log("")\n'
+        '    job.log("启动容器")\n'
+        '    console_env = _console_env_args(project)\n'
+        '    for name, spec in CONTAINERS.items():\n'
+        '        state = container_state(name)',
+        '    for _n, _s in CONTAINERS.items():\n'
+        '        run([docker, "build", "-f", _s["dockerfile"], "-t", _s["image"], _s["context"]], timeout=600)\n'
+        '    job.log("")\n'
+        '    job.log("启动容器")\n'
+        '    console_env = _console_env_args(project)\n'
+        '    for name, spec in CONTAINERS.items():\n'
+        '        state = container_state(name)',
+        "tests/test_desktop_app.py::test_start_services_never_builds_images",
+    ),
+    (
+        "镜像缺失时静默跳过（用户对着空白进度条干等）",
+        "app/deploy.py",
+        '    missing = [spec["image"] for spec in CONTAINERS.values() if not image_exists(spec["image"])]',
+        '    missing = []',
+        "tests/test_desktop_app.py::test_missing_image_is_reported_not_silently_rebuilt",
+    ),
 ]
 
 

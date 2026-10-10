@@ -290,6 +290,156 @@ def _run_deploy(job: DeployJob) -> None:
         job.log("完成。" if job.ok else "未完成，请看上面的报错。")
 
 
+def start_services(project: pathlib.Path) -> DeployJob:
+    """一键启动：Docker（必要时拉起）→ 容器 → 等就绪。
+
+    **和 `start_deploy` 的分工**：
+
+      - `start_deploy` 会**构建镜像**，几分钟。新装机、或者改过代码时用。
+      - 这个是日常用的：开机之后点一下，几十秒内服务就起来了。
+
+    两件事很不一样，混成一个按钮的后果是"每次开机都要等几分钟构建"——
+    而实际上镜像早就有了，构建那步每次都跳过，用户却不知道要等多久。
+
+    共用 `DeployJob` 的日志机制，前端用同一套轮询显示。
+    """
+    job = DeployJob(project)
+    with _JOBS_LOCK:
+        _JOBS[job.id] = job
+        for stale in list(_JOBS)[:-5]:
+            _JOBS.pop(stale, None)
+    threading.Thread(target=_run_start_services, args=(job,), daemon=True).start()
+    return job
+
+
+def _run_start_services(job: DeployJob) -> None:
+    try:
+        job.ok = _start_only(job)
+    except Exception as exc:  # noqa: BLE001
+        job.log(f"✗ 启动中断：{type(exc).__name__}: {exc}")
+        job.ok = False
+    finally:
+        job.done = True
+        job.finished_at = time.time()
+        job.log("")
+        job.log("服务已就绪。" if job.ok else "未能启动，请看上面的提示。")
+
+
+def _wait_for_docker(job: DeployJob, timeout: float = 180.0) -> bool:
+    """等 Docker 守护进程就绪。
+
+    Docker Desktop 从"双击图标"到"引擎可用"通常要 30–90 秒，慢的时候更久。
+    **必须报进度**：一个转 90 秒没有任何反馈的界面，用户会以为程序卡死，
+    然后去点第二次、第三次——而那反而会让它更慢。
+    """
+    started = time.time()
+    ticks = 0
+    while time.time() - started < timeout:
+        ok, detail = docker_running()
+        if ok:
+            job.log(f"  ✓ Docker 就绪（{detail}），用了 {int(time.time() - started)} 秒")
+            return True
+        ticks += 1
+        # 每 15 秒报一次，既不刷屏也让用户知道还在动
+        if ticks % 15 == 1:
+            job.log(f"  等待 Docker 引擎…（已等 {int(time.time() - started)} 秒，"
+                    "首次启动通常要 30–90 秒）")
+        time.sleep(1)
+    job.log(f"  ✗ 等了 {int(timeout)} 秒，Docker 引擎仍未就绪")
+    job.log("    可以看看 Docker Desktop 窗口里是不是有需要处理的提示（比如登录、更新）")
+    return False
+
+
+def _start_only(job: DeployJob) -> bool:
+    """只启动，不构建。"""
+    project = job.project
+
+    # --- Docker ---
+    job.log("检查 Docker")
+    ok, detail = docker_running()
+    if ok:
+        job.log(f"  ✓ 引擎在跑（{detail}）")
+    else:
+        job.log("  · 引擎没在跑，正在拉起 Docker Desktop…")
+        launched, message = launch_docker_desktop()
+        job.log(f"    {message}")
+        if not launched:
+            return False
+        if not _wait_for_docker(job):
+            return False
+
+    docker = find_docker()
+    if not docker:
+        job.log("✗ 找不到 docker 命令，请先安装 Docker Desktop")
+        return False
+
+    # --- 镜像 ---
+    # 没有镜像就**停下来**，不要在这里悄悄构建：那是几分钟的事，
+    # 而用户点的是"启动"，期待的是几十秒。让他明确去点"部署"更诚实。
+    missing = [spec["image"] for spec in CONTAINERS.values() if not image_exists(spec["image"])]
+    if missing:
+        job.log("")
+        job.log("✗ 这些镜像还没有构建过：")
+        for image in missing:
+            job.log(f"    {image}")
+        job.log("")
+        job.log("  去「部署与配置」页点『开始部署』——那一步会构建镜像（几分钟）。")
+        job.log("  以后开机只需要点『一键启动』，不用再构建。")
+        return False
+    job.log("")
+    job.log(f"镜像就绪（{len(CONTAINERS)} 个）")
+
+    # --- 容器 ---
+    job.log("")
+    job.log("启动容器")
+    console_env = _console_env_args(project)
+    for name, spec in CONTAINERS.items():
+        state = container_state(name)
+        if state == "running":
+            job.log(f"  ↺ {name} 已在运行")
+        else:
+            if state:
+                # 存在但停了：先删掉再建。直接 start 有时会因为配置变了而起不来，
+                # 而"起不来"的报错在用户眼里和"命令没生效"没区别。
+                job.log(f"  · {name} 存在但已停止，重新创建")
+                run([docker, "rm", "-f", name], timeout=120)
+            cmd = [docker, "run", "-d", "--name", name, "--restart", "unless-stopped"]
+            for mapping in spec["ports"]:
+                cmd += ["-p", mapping]
+            for mount in spec.get("volumes", []):
+                cmd += ["-v", mount]
+            if name == "govfin-console":
+                cmd += console_env
+            r = run(cmd + [spec["image"]], timeout=300)
+            if r.returncode != 0:
+                job.log(f"  ✗ 启动 {name} 失败：{(r.stderr or r.stdout or '')[:300]}")
+                return False
+            job.log(f"  + {name} 已启动")
+
+        if network_exists() and not _has_network(docker, name):
+            r = run([docker, "network", "connect", "--alias", spec["alias"], NEXENT_NETWORK, name], timeout=60)
+            if r.returncode == 0:
+                job.log(f"    已接入 {NEXENT_NETWORK}")
+
+    # --- 等就绪 ---
+    job.log("")
+    job.log("等待服务就绪 …")
+    for _ in range(20):
+        time.sleep(3)
+        status = container_health("govfin-agent")
+        if "healthy" in status:
+            job.log(f"  ✓ 决策服务 {status}")
+            break
+    else:
+        job.log("  ! 决策服务还没到 healthy；可能只是慢，也可能起不来")
+        job.log("    详细状态看「服务状态」页")
+
+    job.log("")
+    job.log("控制台    http://localhost:8090")
+    job.log("Nexent    http://localhost:3000")
+    return True
+
+
 def _deploy_steps(job: DeployJob) -> bool:
     project = job.project
     docker = find_docker()

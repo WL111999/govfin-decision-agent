@@ -266,6 +266,21 @@ def api_deploy_start(req: DeployRequest) -> dict:
     return job.snapshot()
 
 
+@app.post("/api/services/start")
+def api_services_start() -> dict:
+    """一键启动：把 Docker 和容器拉起来。**不构建镜像。**
+
+    和 `/api/deploy/start` 是两件事：那个构建镜像（几分钟），这个只启动（几十秒）。
+    日常开机用这个——镜像早就有了，每次还等构建是没必要的。
+
+    两种情况明确分开，是为了让"要等多久"变得可预期。混成一个按钮的话，
+    用户每次都得赌这次是几秒还是几分钟。
+    """
+    project = _require_project()
+    job = deploy_mod.start_services(project)
+    return job.snapshot()
+
+
 @app.get("/api/deploy/log")
 def api_deploy_log(job_id: str, offset: int = 0) -> dict:
     job = deploy_mod.get_job(job_id)

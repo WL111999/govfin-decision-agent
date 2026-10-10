@@ -480,3 +480,106 @@ def test_log_stream_does_not_recurse_when_the_log_file_fails(app_logging):
     # 写一个空串和一个纯空白串：不该产生日志行，也不该抛
     assert stream.write("") == 0
     assert stream.write("   \n") == 4
+
+
+# ---------------------------------------------------------------------------
+# 一键启动（区别于一键部署）
+#
+# 用户的实际场景：机器重启后 Docker 没在跑、容器全没起，点一下要能全起来。
+# 这和"部署"是两件事：部署要构建镜像（几分钟），启动只用已构建好的（几十秒）。
+# 两者最重要的差别就是**启动不该构建镜像**——一旦开始构建，用户等的就不是
+# 几十秒而是几分钟，而他不知道自己点错了哪个按钮。
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def app_deploy():
+    sys.path.insert(0, str(_ROOT / "app"))
+    return _load("_app_deploy", "app/deploy.py")
+
+
+def test_start_services_exists_and_is_separate_from_deploy(app_deploy):
+    """启动和部署必须是两个入口。"""
+    assert hasattr(app_deploy, "start_services"), "没有 start_services"
+    assert hasattr(app_deploy, "start_deploy"), "没有 start_deploy"
+    assert app_deploy.start_services is not app_deploy.start_deploy
+
+
+def test_start_services_never_builds_images(app_deploy):
+    """一键启动里**不能**出现 docker build。
+
+    这是它和部署的本质区别，也是用户能预期"几十秒还是几分钟"的唯一依据。
+    真去构建的话，用户点的是"启动"却要等几分钟，而他不知道自己点错了哪个。
+    """
+    import ast
+
+    source = (_ROOT / "app" / "deploy.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    # 取 _start_only 这个函数的源码段
+    target = next((n for n in ast.walk(tree)
+                   if isinstance(n, ast.FunctionDef) and n.name == "_start_only"), None)
+    assert target is not None, "找不到 _start_only"
+    body = ast.get_source_segment(source, target) or ""
+
+    assert '"build"' not in body and "'build'" not in body, (
+        "_start_only 里出现了 docker build —— 启动不该构建镜像"
+    )
+    assert '"run"' in body or "'run'" in body, "没找到启动容器的 docker run"
+
+
+def test_missing_image_is_reported_not_silently_rebuilt(app_deploy):
+    """镜像缺失时要**真的查一遍**，并且**真的中止**。
+
+    静默跳过的后果：用户点"启动"，然后对着一个没有任何解释的进度条等下去，
+    最后拿到一个起不来的服务。
+
+    这里查的是逻辑而不是措辞：`missing` 的赋值里必须真的调用 image_exists，
+    并且那个分支必须能中止流程。只断言"代码里出现了 missing 和 部署 这两个词"
+    是拦不住退化的 —— 把赋值改成 `missing = []`，那些字面量还在，测试照样绿。
+    （变异验证抓到过这一点。）
+    """
+    import ast
+
+    source = (_ROOT / "app" / "deploy.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    target = next((n for n in ast.walk(tree)
+                   if isinstance(n, ast.FunctionDef) and n.name == "_start_only"), None)
+    assert target is not None, "找不到 _start_only"
+
+    # 1) missing 的赋值必须真的去查镜像在不在
+    computed_from_probe = False
+    for node in ast.walk(target):
+        if isinstance(node, ast.Assign) and any(
+            isinstance(tg, ast.Name) and tg.id == "missing" for tg in node.targets
+        ):
+            seg = ast.get_source_segment(source, node.value) or ""
+            computed_from_probe = "image_exists" in seg
+    assert computed_from_probe, (
+        "missing 不是由 image_exists 算出来的 —— 那它恒为空，等于没检查"
+    )
+
+    # 2) 那个分支必须能中止（有 return）
+    guards = [
+        node for node in ast.walk(target)
+        if isinstance(node, ast.If)
+        and "missing" in (ast.get_source_segment(source, node.test) or "")
+    ]
+    assert guards, "没有针对 missing 的分支"
+    aborts = any(
+        isinstance(n, ast.Return) for g in guards for n in ast.walk(g)
+    )
+    assert aborts, "缺镜像时那个分支不会中止流程，会继续往下走去启动容器"
+
+    # 3) 而且要告诉用户下一步去哪
+    body = ast.get_source_segment(source, target) or ""
+    assert "部署" in body or "deploy" in body.lower(), "没告诉用户该去点『部署』"
+
+
+def test_services_start_route_is_registered(app_server):
+    """路由要真的挂上，否则前端点了会 404。"""
+    from fastapi.routing import APIRoute
+
+    paths = {r.path for r in app_server.app.routes if isinstance(r, APIRoute)}
+    assert "/api/services/start" in paths
+    assert "/api/deploy/start" in paths, "部署入口被误删了"

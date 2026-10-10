@@ -86,6 +86,13 @@ button:disabled{opacity:.42;cursor:not-allowed;filter:grayscale(.5)}
 button.ghost{background:#151d33;color:var(--ink-2);border:1px solid var(--line)}
 button.ghost:hover:not(:disabled){background:#1b2440;color:var(--ink);box-shadow:none;filter:none}
 button.tiny{padding:6px 13px;font-size:12.5px;border-radius:8px}
+/* 服务不可用时，"一键启动"是页面上唯一该被点的那颗按钮。
+   轻微脉冲而不是闪烁：目的是把视线引过去，不是让人焦虑。 */
+button.urgent{animation:urgent 2.4s ease-in-out infinite}
+@keyframes urgent{
+  0%,100%{box-shadow:0 0 0 0 rgba(77,141,255,.55)}
+  50%{box-shadow:0 0 0 9px rgba(77,141,255,0)}
+}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .hint{font-size:12px;color:var(--ink-3);line-height:1.75}
 code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
@@ -287,7 +294,16 @@ code{background:#161f36;padding:2px 7px;border-radius:5px;font-size:12px;
         <h2>服务状态</h2>
         <p class="lead">四块服务有一块没起来，后面的步骤就会失败。</p>
         <div id="statusBody"><div class="empty">正在检查…</div></div>
-        <div class="row" style="margin-top:16px"><button class="ghost" onclick="loadStatus(1)">重新检查</button></div>
+        <div class="row" style="margin-top:16px">
+          <button id="btnStart" onclick="startServices()">一键启动</button>
+          <button class="ghost" onclick="loadStatus(1)">重新检查</button>
+        </div>
+        <p class="hint" style="margin-top:10px">
+          「一键启动」会拉起 Docker（如果没在跑）再启动服务，通常几十秒。
+          镜像还没构建过时会提示你去「部署与配置」页——那一步是几分钟的事，
+          不该混在这个按钮里。
+        </p>
+        <div class="log hidden" id="startLog"></div>
       </div>
 
       <div class="card">
@@ -959,6 +975,62 @@ function flash(msg) {
    七、服务状态
    =========================================================================== */
 
+/* 一键启动：Docker（必要时拉起）→ 容器 → 等就绪。
+   日志复用部署页那套轮询，因为它处理的正是同一件事：一个要跑几十秒、
+   需要边跑边报进度的后台任务。 */
+let startPoll = null;
+
+async function startServices() {
+  const btn = $('#btnStart');
+  const log = $('#startLog');
+  log.classList.remove('hidden');
+  log.textContent = '';
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>启动中';
+
+  try {
+    const r = await fetch('/api/services/start', { method: 'POST' });
+    const job = await r.json();
+    if (!r.ok) {
+      log.textContent = job.detail?.error || job.detail?.hint || '启动失败';
+      resetStartBtn(); return;
+    }
+    let offset = 0;
+    clearInterval(startPoll);
+    startPoll = setInterval(async () => {
+      try {
+        const d = await (await fetch(`/api/deploy/log?job_id=${job.job_id}&offset=${offset}`)).json();
+        if (d.lines?.length) {
+          const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+          for (const line of d.lines) {
+            const el = document.createElement('div');
+            el.textContent = line || ' ';
+            if (/✓|已启动|就绪|服务已就绪/.test(line)) el.className = 'l-ok';
+            else if (/✗|失败|未就绪/.test(line)) el.className = 'l-bad';
+            else if (/^[^ ·↺+]/.test(line)) el.className = 'l-hd';
+            log.appendChild(el);
+          }
+          if (atBottom) log.scrollTop = log.scrollHeight;
+          offset = d.next_offset;
+        }
+        if (d.done) {
+          clearInterval(startPoll);
+          resetStartBtn();
+          await loadStatus();          // 启动完就刷新状态，不用用户再点一次
+          if (d.ok) $('#tabDot').classList.add('hide');
+        }
+      } catch (e) { clearInterval(startPoll); resetStartBtn(); }
+    }, 700);
+  } catch (e) {
+    log.textContent = '启动失败：' + e.message;
+    resetStartBtn();
+  }
+}
+
+function resetStartBtn() {
+  const btn = $('#btnStart');
+  btn.disabled = false; btn.textContent = '一键启动';
+}
+
 async function loadStatus(manual) {
   const box = $('#statusBody');
   if (isFile) { box.innerHTML = '<div class="err">这个页面需要从应用窗口打开。</div>'; return; }
@@ -987,9 +1059,12 @@ async function loadStatus(manual) {
     box.innerHTML = h;
     const bad = d.services.some(s => !s.ok) || !g;
     $('#tabDot').classList.toggle('hide', !bad);
+    // 服务不可用时，把视线引到唯一该点的那个按钮上
+    $('#btnStart')?.classList.toggle('urgent', bad);
   } catch (e) {
     box.innerHTML = `<div class="err">检查失败：${esc(e.message)}</div>`;
     $('#tabDot').classList.remove('hide');
+    $('#btnStart')?.classList.add('urgent');
   }
 }
 

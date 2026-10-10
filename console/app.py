@@ -107,7 +107,8 @@ class McpClient:
         }
         req = urllib.request.Request(self.url, data=json.dumps(payload).encode(), headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            # 同样是本机服务，连不上要快说
+            with urllib.request.urlopen(req, timeout=4) as resp:
                 self.session = resp.headers.get("mcp-session-id")
                 resp.read()
         except Exception:  # noqa: BLE001
@@ -143,7 +144,9 @@ def _call_govfin(tool: str, args: dict) -> Any:
 
 
 def _check(name: str, url: str, *, expect_key: str | None = None) -> dict:
-    status, raw = _http("GET", url, timeout=8)
+    # 3 秒。这些都是**本机**服务：连得上就是毫秒级，连不上就是没起来——
+    # 给 8 秒只是在让用户多等 8 秒才知道同一件事。
+    status, raw = _http("GET", url, timeout=3)
     ok = status == 200
     detail = ""
     if ok and expect_key:
@@ -172,11 +175,18 @@ def api_status() -> dict:
     分开查的话，页面会东一块西一块地亮起来，用户看到的是"有的绿有的灰"，
     分不清是还在加载还是真的坏了。
     """
-    services = [
-        _check("决策服务", f"{GOVFIN_A2A}/health", expect_key="status"),
-        _check("向量化服务", f"{EMBEDDING_URL}/health", expect_key="model"),
-        _check("Nexent 后端", f"{NEXENT_API}/openapi.json"),
-    ]
+    # **并行探**。串行的话，服务全不在时要等「超时 × 3」——用户看到的是一个
+    # 转很久的"正在检查…"，而它其实什么也查不到。并行之后总耗时等于最慢的那个。
+    import concurrent.futures as _cf
+
+    _checks = (
+        ("决策服务", f"{GOVFIN_A2A}/health", "status"),
+        ("向量化服务", f"{EMBEDDING_URL}/health", "model"),
+        ("Nexent 后端", f"{NEXENT_API}/openapi.json", None),
+    )
+    with _cf.ThreadPoolExecutor(max_workers=len(_checks)) as _pool:
+        _futures = [_pool.submit(_check, name, url, expect_key=key) for name, url, key in _checks]
+        services = [f.result() for f in _futures]
 
     decision: dict = {"graph": None, "tools": 0}
     try:
